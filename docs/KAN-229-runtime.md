@@ -31,7 +31,7 @@ expo-doctor online: **20/20**. Se sigue el catálogo remoto oficial, que la prop
 
 ## Smoke y base Git verificados
 
-El usuario aprobó el smoke final en iPhone 15 Pro Max, iOS 27.2, Expo Go 58.05 informado por usuario, proyecto SDK 58. Se comprobaron apertura, teclado, validación vacía, Design system/Registro con retorno y, después, login existente contra la API demo y navegación autenticada con logout. El footer del login se corrigió mínimamente para mantener Registrarse dentro del viewport.
+El usuario aprobó el smoke final en iPhone 13 Pro Max, iOS 27.2, Expo Go 58.05 informado por usuario, proyecto SDK 58. Se comprobaron apertura, teclado, validación vacía, Design system/Registro con retorno y, después, login existente contra la API demo y navegación autenticada con logout. El footer del login se corrigió mínimamente para mantener Registrarse dentro del viewport.
 
 API demo usada: https://padelcheck-api.onrender.com/api, mediante EXPO_PUBLIC_API_BASE_URL solo en el proceso de Metro, sin .env versionado ni cambios del cliente. Health/login/me dieron 200 desde PC; el usuario confirmó formulario y navegación en dispositivo. No se guardaron tokens o credenciales en evidencia.
 
@@ -44,3 +44,7 @@ Avisos no bloqueantes observados: ImageBackground deprecado y una declaración d
 El usuario pidió conservar la excepción de firewall privada para Node/TCP8099/subred local. La limpieza de la sesión anterior se verificó; en la sesión actual la excepción queda activa y los bloqueos explícitos deshabilitados por esa instrucción. No se afirma limpieza final. Registro completo: docs/refinements/KAN-229-baseline-preservation.md del workspace.
 
 Fuentes oficiales: guía incremental y changelogs Expo 55–58, migraciones Router, NativeWind v4 y compatibilidad Reanimated.
+
+## Evidencia Android posterior a la integración
+
+Ver [smoke Android con development build propia](KAN-229-android-smoke.md), ejecutado sobre origin/main integrado el 28/10/2026. La evidencia de exportación Android anterior queda diferenciada de esta ejecución en emulador.
