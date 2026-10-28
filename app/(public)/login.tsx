@@ -133,7 +133,7 @@ export default function LoginScreen() {
               </CardContent>
             </View>
           </Form>
-          <CardFooter className="gap-3 border-t border-divider pt-6">
+          <CardFooter className="flex-col gap-3 border-t border-divider pt-6">
             <Button variant="secondary" className="w-full" onPress={() => router.push(ROUTES.designSystem)}>
               Ver Design System
             </Button>
