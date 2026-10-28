@@ -16,6 +16,7 @@ import { API_BASE } from '@/lib/constants'
 
 const queryClient = new QueryClient({
   defaultOptions: {
+    mutations: { retry: false },
     queries: { retry: 1, refetchOnWindowFocus: false },
   },
 })
