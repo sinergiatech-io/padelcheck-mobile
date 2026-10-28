@@ -1,3 +1,4 @@
+import { resolveApiBase, isLocalEnvironment } from './api-config'
 import Constants from 'expo-constants'
 import { Platform } from 'react-native'
 
@@ -40,14 +41,17 @@ function getDevHost(): string | null {
 }
 
 function defaultApiBase(): string {
-  if (__DEV__) {
+  if (isLocalEnvironment(process.env.EXPO_PUBLIC_APP_ENV, __DEV__)) {
     const host = getDevHost()
     if (host) return `http://${host}:8080/api`
     if (Platform.OS === 'android') return 'http://10.0.2.2:8080/api'
     return 'http://localhost:8080/api'
   }
-  return 'http://localhost:8080/api'
+  return ''
 }
 
-export const API_BASE =
-  typeof envBase === 'string' && envBase.length > 0 ? envBase : defaultApiBase()
+export const API_BASE = resolveApiBase(
+  envBase,
+  isLocalEnvironment(process.env.EXPO_PUBLIC_APP_ENV, __DEV__),
+  defaultApiBase(),
+)

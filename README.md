@@ -1,10 +1,10 @@
 # Padel Check — Mobile
 
-App Expo (SDK 54) con **NativeWind v4** (mismos tokens que `padelcheck-fe`), **Expo Router**, **Auth** (`SecureStore` + mismo contrato de login que el backend) y pantalla **Design system**.
+App Expo (SDK 58) con **NativeWind v4** (mismos tokens que `padelcheck-fe`), **Expo Router**, **Auth** (`SecureStore` + mismo contrato de login que el backend) y pantalla **Design system**.
 
 ## Requisitos
 
-- Node.js 20+
+- Node.js 22.13+ o 24.3+ (validado con 24.22.1)
 - Cuenta Expo / Expo Go o emulador Android / simulador iOS
 
 ## Scripts
@@ -21,7 +21,7 @@ npm run typecheck    # tsc --noEmit
 
 ### Comportamiento por defecto (desarrollo)
 
-En `__DEV__`, si **no** definís `EXPO_PUBLIC_API_BASE_URL`, la base se resuelve así:
+En `__DEV__` y ambiente local, si **no** definís `EXPO_PUBLIC_API_BASE_URL`, la base se resuelve así:
 
 1. **Expo Go en LAN:** se usa la IP/host del bundler (la de tu PC) vía `expo-constants` (`hostUri` / `debuggerHost`), p. ej. `http://192.168.1.10:8080/api`. Así el iPhone físico no usa `localhost` (que apunta al propio teléfono).
 2. **Android emulador:** si no hay host de Expo, fallback `http://10.0.2.2:8080/api`.
@@ -33,7 +33,7 @@ Al arrancar la app en desarrollo verás en la consola de Metro: `[padelcheck] AP
 
 ### Override manual
 
-Creá `.env` en la raíz del proyecto mobile o exportá antes de `expo start`:
+Creá `.env.local` en la raíz del proyecto mobile o exportá antes de `expo start`:
 
 ```bash
 EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:8080/api
@@ -72,3 +72,7 @@ EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:8080/api
 ## UI Kit
 
 Componentes en `src/components/ui/` (Button, Input, Card, Form, etc.) con **className** Tailwind alineado al design system del frontend web.
+
+## HTTP y ambientes
+
+Configuración local/validación, contrato de errores, cancelación y pruebas: [docs/http-environments.md](docs/http-environments.md).
