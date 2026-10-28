@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 
 const PLACEHOLDER = '#6b7280'
 
-const Textarea = React.forwardRef<TextInput, TextInputProps>(({ className, multiline, placeholderTextColor, ...props }, ref) => {
+const Textarea = React.forwardRef<React.ComponentRef<typeof TextInput>, TextInputProps>(({ className, multiline, placeholderTextColor, ...props }, ref) => {
   return (
     <TextInput
       ref={ref}

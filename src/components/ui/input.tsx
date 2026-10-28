@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 
 const PLACEHOLDER = '#6b7280'
 
-const Input = React.forwardRef<TextInput, TextInputProps>(({ className, placeholderTextColor, ...props }, ref) => {
+const Input = React.forwardRef<React.ComponentRef<typeof TextInput>, TextInputProps>(({ className, placeholderTextColor, ...props }, ref) => {
   return (
     <TextInput
       ref={ref}

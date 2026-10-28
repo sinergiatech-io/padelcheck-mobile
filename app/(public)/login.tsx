@@ -124,7 +124,9 @@ export default function LoginScreen() {
                   className="w-full"
                   disabled={mutation.isPending}
                   loading={mutation.isPending}
-                  onPress={form.handleSubmit((v) => mutation.mutate(v))}
+                  onPress={() => {
+                    void form.handleSubmit((v) => mutation.mutate(v))()
+                  }}
                 >
                   {mutation.isPending ? 'Ingresando...' : 'Entrar'}
                 </Button>

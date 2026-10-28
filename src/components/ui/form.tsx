@@ -63,7 +63,7 @@ function useFormField() {
   }
 }
 
-const FormItem = React.forwardRef<View, ViewProps>(({ className, ...props }, ref) => {
+const FormItem = React.forwardRef<React.ComponentRef<typeof View>, ViewProps>(({ className, ...props }, ref) => {
   const id = React.useId().replace(/:/g, '_')
   return (
     <FormItemContext.Provider value={{ id }}>
@@ -73,7 +73,7 @@ const FormItem = React.forwardRef<View, ViewProps>(({ className, ...props }, ref
 })
 FormItem.displayName = 'FormItem'
 
-const FormLabel = React.forwardRef<Text, React.ComponentPropsWithoutRef<typeof Label>>(
+const FormLabel = React.forwardRef<React.ComponentRef<typeof Text>, React.ComponentPropsWithoutRef<typeof Label>>(
   ({ className, ...props }, ref) => {
     const { error, formItemId } = useFormField()
     return <Label ref={ref} className={cn(error && 'text-error', className)} {...props} />
@@ -94,7 +94,7 @@ const FormControl = ({ children }: { children: React.ReactNode }) => {
 }
 FormControl.displayName = 'FormControl'
 
-const FormDescription = React.forwardRef<Text, TextProps>(({ className, ...props }, ref) => {
+const FormDescription = React.forwardRef<React.ComponentRef<typeof Text>, TextProps>(({ className, ...props }, ref) => {
   const { formDescriptionId } = useFormField()
   return (
     <Text
@@ -107,7 +107,7 @@ const FormDescription = React.forwardRef<Text, TextProps>(({ className, ...props
 })
 FormDescription.displayName = 'FormDescription'
 
-const FormMessage = React.forwardRef<Text, TextProps>(({ className, children, ...props }, ref) => {
+const FormMessage = React.forwardRef<React.ComponentRef<typeof Text>, TextProps>(({ className, children, ...props }, ref) => {
   const { error, formMessageId } = useFormField()
   const body = error ? String(error.message ?? '') : children
 

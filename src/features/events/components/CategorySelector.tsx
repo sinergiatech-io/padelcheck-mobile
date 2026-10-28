@@ -1,3 +1,4 @@
+import type { ComponentRef } from 'react'
 import { router } from 'expo-router'
 import { ChevronDown } from 'lucide-react-native'
 import { TrophyFilledIcon } from '@/components/icons/TrophyIcon'
@@ -15,7 +16,7 @@ type CategorySelectorProps = {
 
 export function CategorySelector({ event, category, activeTab }: CategorySelectorProps) {
   const [open, setOpen] = useState(false)
-  const containerRef = useRef<View>(null)
+  const containerRef = useRef<ComponentRef<typeof View>>(null)
 
   useEffect(() => {
     setOpen(false)
