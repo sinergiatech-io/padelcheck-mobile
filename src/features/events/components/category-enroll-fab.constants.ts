@@ -1,0 +1,9 @@
+/** CTA Inscribirse — Figma 358:2002 / 378:6058 */
+export const CATEGORY_ENROLL_FAB_HEIGHT = 40
+export const CATEGORY_ENROLL_FAB_WIDTH = 338
+export const CATEGORY_ENROLL_FAB_BOTTOM_GAP = 16
+export const CATEGORY_ENROLL_FAB_SCROLL_EXTRA = 32
+
+export function categoryEnrollFabScrollPadding() {
+  return CATEGORY_ENROLL_FAB_BOTTOM_GAP + CATEGORY_ENROLL_FAB_HEIGHT + CATEGORY_ENROLL_FAB_SCROLL_EXTRA
+}
