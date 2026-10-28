@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { router } from 'expo-router'
-import { useFocusEffect } from '@react-navigation/native'
+import { useFocusEffect } from 'expo-router'
 import { Pressable, Text, View } from 'react-native'
 import { ChevronRight, MapPin } from 'lucide-react-native'
 import { FigmaSearchField } from '@/components/ui/figma-search-field'

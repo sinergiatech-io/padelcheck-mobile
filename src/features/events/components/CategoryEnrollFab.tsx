@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   insetShadow: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 8,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.4)',

@@ -1,10 +1,11 @@
+import type { ColorValue } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
 
 const VIEW_BOX = '0 0 19.9832 19.9832'
 const STROKE_WIDTH = 1.66527
 
 type BottomNavIconProps = {
-  color: string
+  color: ColorValue
   size?: number
 }
 
