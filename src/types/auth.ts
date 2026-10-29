@@ -9,6 +9,17 @@ export interface ActiveClubSummary {
   name: string
 }
 
+export interface AccessContextSummary {
+  activity: 'PLAYER' | 'CLUB'
+  playerId?: string | null
+  clubId?: string | null
+  membershipId?: string | null
+  role?: string | null
+  initialSetupStatus?: 'COMPLETED' | 'PENDING' | 'UNKNOWN' | null
+  clubStatus?: 'ACTIVE' | 'INACTIVE' | null
+  permissions?: string[] | null
+}
+
 /** Matches backend AuthContextResponse (login + /auth/me). */
 export interface AuthPrincipal {
   userId: string
@@ -20,6 +31,7 @@ export interface AuthPrincipal {
   playerId: string | null
   clubMemberships: ClubMembershipSummary[]
   activeClub: ActiveClubSummary | null
+  accessContexts?: AccessContextSummary[] | null
 }
 
 export function displayName(p: AuthPrincipal | null | undefined): string {

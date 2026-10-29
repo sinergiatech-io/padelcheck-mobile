@@ -9,6 +9,7 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "test:http": "node scripts/test-http.cjs",
+    "test:session": "node scripts/test-session.cjs",
     "smoke:http": "node scripts/test-http.cjs --smoke"
   },
   "dependencies": {

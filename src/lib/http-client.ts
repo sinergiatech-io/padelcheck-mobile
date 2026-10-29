@@ -38,6 +38,19 @@ interface ClientConfig {
   credentials?: RequestCredentials
 }
 
+type HttpErrorListener = (error: ApiError) => void
+
+let httpErrorListener: HttpErrorListener | null = null
+
+/** Reports transport failures. Session policy stays in the auth layer. */
+export function setHttpErrorListener(listener: HttpErrorListener | null): void {
+  httpErrorListener = listener
+}
+
+function notifyHttpError(error: ApiError): void {
+  httpErrorListener?.(error)
+}
+
 export function createApiClient({ baseUrl, getToken, credentials }: ClientConfig) {
   async function request<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
     const { timeoutMs, signal, ...init } = options
@@ -72,7 +85,11 @@ export function createApiClient({ baseUrl, getToken, credentials }: ClientConfig
         try {
           payload = JSON.parse(raw)
         } catch {
-          if (response.ok) throw new ApiError('Invalid JSON response', response.status, raw, 'invalid-response')
+          if (response.ok) {
+            const invalid = new ApiError('Invalid JSON response', response.status, raw, 'invalid-response')
+            notifyHttpError(invalid)
+            throw invalid
+          }
           // Preserve malformed error bodies just like text/HTML gateway errors.
         }
       } else if (!raw.trim()) {
@@ -83,15 +100,25 @@ export function createApiClient({ baseUrl, getToken, credentials }: ClientConfig
         if (payload && typeof payload === 'object' && 'message' in payload && typeof payload.message === 'string') {
           message = payload.message
         }
-        throw new ApiError(message, response.status, payload)
+        const httpError = new ApiError(message, response.status, payload)
+        notifyHttpError(httpError)
+        throw httpError
       }
       return payload as T
     } catch (error) {
       if (error instanceof ApiError) throw error
-      if (controller.signal.aborted) {
-        throw new ApiError(timedOut ? 'Request timed out' : 'Request cancelled', response?.status ?? 0, undefined, timedOut ? 'timeout' : 'cancelled')
-      }
-      throw new ApiError('Network request failed', response?.status ?? 0, undefined, 'network')
+      const transport = new ApiError(
+        controller.signal.aborted
+          ? timedOut
+            ? 'Request timed out'
+            : 'Request cancelled'
+          : 'Network request failed',
+        response?.status ?? 0,
+        undefined,
+        controller.signal.aborted ? (timedOut ? 'timeout' : 'cancelled') : 'network',
+      )
+      notifyHttpError(transport)
+      throw transport
     } finally {
       if (timer !== undefined) clearTimeout(timer)
       signal?.removeEventListener('abort', cancel)

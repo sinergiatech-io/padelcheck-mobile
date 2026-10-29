@@ -1,4 +1,4 @@
-import { Redirect, Tabs } from 'expo-router'
+import { Redirect, Tabs, usePathname } from 'expo-router'
 import { ActivityIndicator, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
@@ -11,6 +11,8 @@ import {
   BottomNavTournamentsIcon,
 } from '@/components/icons/BottomNavIcons'
 import { useAuth } from '@/context/AuthContext'
+import { guardRedirect } from '@/features/auth/access-destination'
+import { SessionUnverified } from '@/features/auth/SessionUnverified'
 import { ROUTES } from '@/lib/constants'
 
 const TAB_BAR_CONTENT_HEIGHT = 64
@@ -24,7 +26,7 @@ const tabBarLabelStyle = {
   textAlign: 'center' as const,
 }
 
-function AppTabs() {
+function AppTabs({ mode }: { mode: 'player' | 'club' }) {
   const insets = useSafeAreaInsets()
 
   return (
@@ -63,6 +65,7 @@ function AppTabs() {
         name="events"
         options={{
           title: 'Eventos',
+          href: mode === 'club' ? null : undefined,
           tabBarIcon: ({ color }) => <BottomNavEventsIcon color={color} size={BOTTOM_NAV_ICON_SIZE} />,
         }}
       />
@@ -70,6 +73,7 @@ function AppTabs() {
         name="my-tournaments"
         options={{
           title: 'Mis Torneos',
+          href: mode === 'club' ? null : undefined,
           tabBarIcon: ({ color }) => <BottomNavTournamentsIcon color={color} size={BOTTOM_NAV_ICON_SIZE} />,
         }}
       />
@@ -77,6 +81,7 @@ function AppTabs() {
         name="players"
         options={{
           title: 'Jugadores',
+          href: mode === 'club' ? null : undefined,
           tabBarIcon: ({ color }) => <BottomNavPlayersIcon color={color} size={BOTTOM_NAV_ICON_SIZE} />,
         }}
       />
@@ -84,28 +89,38 @@ function AppTabs() {
         name="settings"
         options={{
           title: 'Perfil',
+          href: mode === 'club' ? null : undefined,
           tabBarIcon: ({ color }) => <BottomNavProfileIcon color={color} size={BOTTOM_NAV_ICON_SIZE} />,
         }}
       />
-      <Tabs.Screen name="dashboard" options={{ href: null }} />
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: 'Club',
+          href: mode === 'player' ? null : undefined,
+        }}
+      />
     </Tabs>
   )
 }
 
 export default function AppGroupLayout() {
-  const { isAuthenticated, isLoading } = useAuth()
+  const pathname = usePathname()
+  const { phase, destination } = useAuth()
 
-  if (isLoading) {
+  if (phase === 'checking') {
     return (
-      <View className="flex-1 items-center justify-center bg-background">
+      <View className="flex-1 items-center justify-center bg-[#120F18]">
         <ActivityIndicator size="large" color="#C9CF38" />
       </View>
     )
   }
 
-  if (!isAuthenticated) {
-    return <Redirect href={ROUTES.login} />
-  }
+  if (phase === 'unverified') return <SessionUnverified />
+  if (phase !== 'ready' || !destination) return <Redirect href={ROUTES.login} />
 
-  return <AppTabs />
+  const redirect = guardRedirect('native', destination, pathname)
+  if (redirect) return <Redirect href={redirect} />
+
+  return <AppTabs mode={destination.kind === 'club' ? 'club' : 'player'} />
 }
