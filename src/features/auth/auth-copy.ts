@@ -1,10 +1,22 @@
 import { ApiError } from '@/lib/api-client'
 import type { ContinueReason } from './access-destination'
 
+export type LoginBannerTone = 'error' | 'warning' | 'neutral'
+
+export type LoginNotice = {
+  tone: LoginBannerTone
+  title: string
+  detail?: string
+  code?: string
+}
+
 export const AUTH_COPY = {
-  invalidCredentials: 'El email o la contraseña son incorrectos.',
-  unverifiedEmail: 'Verificá tu email para iniciar sesión.',
-  blocked: 'Tu cuenta está bloqueada. No podés iniciar sesión.',
+  invalidCredentialsTitle: 'Email o contraseña incorrectos',
+  invalidCredentialsDetail: 'Revisá los datos e intentá de nuevo.',
+  unverifiedTitle: 'Falta verificar tu email',
+  unverifiedDetail: 'Abrí el correo de verificación y después volvé a entrar.',
+  blockedTitle: 'Cuenta bloqueada',
+  blockedDetail: 'No podés iniciar sesión con esta cuenta.',
   unavailableAccount: 'No podemos habilitar el acceso a esta cuenta.',
   network: 'No pudimos conectarnos. Intentá de nuevo.',
   unknownLogin: 'No pudimos iniciar sesión. Intentá de nuevo.',
@@ -20,20 +32,36 @@ export const AUTH_COPY = {
   backToAccess: 'Volver al acceso',
 } as const
 
-export function loginErrorMessage(error: unknown): string {
-  if (!(error instanceof ApiError)) return AUTH_COPY.network
-  if (error.kind === 'network' || error.kind === 'timeout' || error.status >= 500) return AUTH_COPY.network
+export function loginErrorMessage(error: unknown): LoginNotice {
+  if (!(error instanceof ApiError) || error.kind === 'network' || error.kind === 'timeout' || error.status >= 500) {
+    return { tone: 'error', title: AUTH_COPY.network }
+  }
   switch (error.code) {
     case 'AUTH_INVALID_CREDENTIALS':
-      return AUTH_COPY.invalidCredentials
+      return {
+        tone: 'error',
+        title: AUTH_COPY.invalidCredentialsTitle,
+        detail: AUTH_COPY.invalidCredentialsDetail,
+        code: error.code,
+      }
     case 'AUTH_EMAIL_UNVERIFIED':
-      return AUTH_COPY.unverifiedEmail
+      return {
+        tone: 'warning',
+        title: AUTH_COPY.unverifiedTitle,
+        detail: AUTH_COPY.unverifiedDetail,
+        code: error.code,
+      }
     case 'AUTH_ACCOUNT_BLOCKED':
-      return AUTH_COPY.blocked
+      return {
+        tone: 'neutral',
+        title: AUTH_COPY.blockedTitle,
+        detail: AUTH_COPY.blockedDetail,
+        code: error.code,
+      }
     case 'AUTH_ACCOUNT_UNAVAILABLE':
-      return AUTH_COPY.unavailableAccount
+      return { tone: 'neutral', title: AUTH_COPY.unavailableAccount, code: error.code }
     default:
-      return AUTH_COPY.unknownLogin
+      return { tone: 'error', title: AUTH_COPY.unknownLogin }
   }
 }
 
