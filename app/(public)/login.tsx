@@ -192,7 +192,10 @@ export default function LoginScreen() {
               textContentType="password"
               placeholder="Ingresá tu contraseña"
               placeholderTextColor="#605E64"
-              className="h-[56px] flex-1 bg-[#FEFEFE] font-inter-500 text-[14px] leading-[20px] text-[#120F18]"
+              underlineColorAndroid="transparent"
+              includeFontPadding={false}
+              className="h-[24px] min-w-0 flex-1 bg-transparent p-0 font-inter-500 text-[14px] leading-[20px] text-[#120F18]"
+              style={{ paddingVertical: 0, textAlignVertical: 'center' }}
             />
             <Pressable
               accessibilityLabel={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
@@ -228,9 +231,9 @@ export default function LoginScreen() {
             </Text>
           </Pressable>
           <View accessibilityElementsHidden className="mt-[16px] h-[24px] flex-row items-center gap-[12px]">
-            <View className="h-px flex-1 bg-[#E7E7E8]" />
+            <View className="h-px flex-1 bg-[#B6B5B7]" />
             <Text className="font-sans text-[16px] leading-[24px] text-[#605E64]">o</Text>
-            <View className="h-px flex-1 bg-[#E7E7E8]" />
+            <View className="h-px flex-1 bg-[#B6B5B7]" />
           </View>
           <View
             accessibilityRole="button"
