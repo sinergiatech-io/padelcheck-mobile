@@ -193,6 +193,8 @@ export default function LoginScreen() {
               placeholder="Ingresá tu contraseña"
               placeholderTextColor="#605E64"
               underlineColorAndroid="transparent"
+              // RN 0.88 types omit this Android-only prop; the native view still honors it.
+              // @ts-expect-error includeFontPadding is applied on Android.
               includeFontPadding={false}
               className="h-[24px] min-w-0 flex-1 bg-transparent p-0 font-inter-500 text-[14px] leading-[20px] text-[#120F18]"
               style={{ paddingVertical: 0, textAlignVertical: 'center' }}
