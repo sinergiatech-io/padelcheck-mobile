@@ -1,6 +1,7 @@
 import { X } from 'lucide-react-native'
 import { SearchFieldIcon } from '@/components/icons/SearchFieldIcon'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Button } from '@/components/ui/button'
 import { Keyboard, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { PlayerPersonIcon } from '@/components/icons/PlayerPersonIcon'
 import { cn } from '@/lib/utils'
@@ -164,6 +165,7 @@ export function EnrollmentModal({ eventId, categoryId, onSuccess }: EnrollmentMo
   const { isOpen, mode, registration, close } = useEnrollmentModal()
   const [currentPlayer, setCurrentPlayer] = useState<EnrollablePlayer | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const submittingRef = useRef(false)
   const [modalHeight, setModalHeight] = useState(0)
 
   useEffect(() => {
@@ -185,7 +187,8 @@ export function EnrollmentModal({ eventId, categoryId, onSuccess }: EnrollmentMo
   const { keyboardOpen, overlayPaddingTop, maxModalHeight } = useEnrollmentModalKeyboard(isOpen, modalHeight)
 
   const onConfirm = async () => {
-    if (!player1 || !player2 || submitting) return
+    if (!player1 || !player2 || submittingRef.current) return
+    submittingRef.current = true
     setSubmitting(true)
     try {
       if (mode === 'create') {
@@ -196,6 +199,7 @@ export function EnrollmentModal({ eventId, categoryId, onSuccess }: EnrollmentMo
       close()
       onSuccess()
     } finally {
+      submittingRef.current = false
       setSubmitting(false)
     }
   }
@@ -236,11 +240,13 @@ export function EnrollmentModal({ eventId, categoryId, onSuccess }: EnrollmentMo
           <Pressable onPress={close} className="h-10 flex-1 items-center justify-center rounded-lg bg-[#e7e7e8]">
             <Text className="font-sans text-body-sm font-medium text-[#605e64]">Cancelar</Text>
           </Pressable>
-          <Pressable
+          <Button
             disabled={!isConfirmEnabled}
+            loading={submitting}
+            loadingLabel="Confirmando inscripción…"
             onPress={() => void onConfirm()}
             className={cn(
-              'h-10 flex-1 items-center justify-center rounded-lg',
+              'h-10 flex-1 items-center justify-center rounded-lg px-0 disabled:opacity-100',
               isConfirmEnabled ? 'bg-primary-500' : 'bg-[#eef0c1] opacity-50',
             )}
           >
@@ -252,7 +258,7 @@ export function EnrollmentModal({ eventId, categoryId, onSuccess }: EnrollmentMo
             >
               Confirmar
             </Text>
-          </Pressable>
+          </Button>
         </View>
       </View>
     </>

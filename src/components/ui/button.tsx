@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { ActivityIndicator, Pressable, Text, type PressableProps } from 'react-native'
+import { AccessibilityInfo, ActivityIndicator, Pressable, Text, View, type PressableProps } from 'react-native'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
@@ -52,6 +52,7 @@ const textVariants = cva('text-center text-sm font-inter-500', {
 
 export interface ButtonProps extends Omit<PressableProps, 'children'>, VariantProps<typeof buttonVariants> {
   loading?: boolean
+  loadingLabel?: string
   leftIcon?: React.ReactNode
   rightIcon?: React.ReactNode
   children?: React.ReactNode
@@ -64,31 +65,57 @@ const Button = React.forwardRef<React.ElementRef<typeof Pressable>, ButtonProps>
       variant,
       size,
       loading,
+      loadingLabel = 'Procesando…',
       leftIcon,
       rightIcon,
       disabled,
       children,
+      accessibilityLabel,
+      accessibilityState,
       ...props
     },
     ref,
   ) => {
     const isString = typeof children === 'string' || typeof children === 'number'
+    const [reduceMotion, setReduceMotion] = React.useState(false)
+    React.useEffect(() => {
+      let active = true
+      void AccessibilityInfo.isReduceMotionEnabled().then((value) => { if (active) setReduceMotion(value) })
+      const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion)
+      return () => { active = false; subscription.remove() }
+    }, [])
+    const blocked = Boolean(disabled || loading)
     return (
       <Pressable
         ref={ref}
-        disabled={disabled ?? loading}
+        disabled={blocked}
+        accessibilityRole="button"
+        accessibilityLabel={loading ? loadingLabel : accessibilityLabel ?? (isString ? String(children) : undefined)}
+        accessibilityState={{ ...accessibilityState, disabled: blocked, busy: Boolean(loading) }}
         className={cn(buttonVariants({ variant, size, className }))}
         {...props}
       >
-        {loading ? <ActivityIndicator color={variant === 'destructive' ? '#fff' : '#120F18'} /> : null}
-        {!loading && leftIcon}
-        {!loading &&
-          (isString ? (
+        <View className="flex-row items-center justify-center gap-2" style={{ opacity: loading ? 0 : 1 }}
+          accessibilityElementsHidden={Boolean(loading)} importantForAccessibility={loading ? 'no-hide-descendants' : 'auto'}>
+          {leftIcon}
+          {isString ? (
             <Text className={cn(textVariants({ variant, size }))}>{children}</Text>
           ) : (
             children
-          ))}
-        {!loading && rightIcon}
+          )}
+          {rightIcon}
+        </View>
+        {loading && (
+          <View pointerEvents="none" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
+            className="absolute inset-0 items-center justify-center">
+            {reduceMotion ? (
+              <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2,
+                borderColor: variant === 'destructive' ? '#fff' : '#120F18', borderTopColor: 'transparent' }} />
+            ) : (
+              <ActivityIndicator size="small" color={variant === 'destructive' ? '#fff' : '#120F18'} />
+            )}
+          </View>
+        )}
       </Pressable>
     )
   },

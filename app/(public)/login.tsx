@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SvgXml } from 'react-native-svg'
 import { z } from 'zod'
 import { useAuth } from '@/context/AuthContext'
+import { Button } from '@/components/ui/button'
 import { consumeLoginNotice } from '@/features/auth/login-notice'
 import { login as loginRequest } from '@/features/auth/api/login'
 import { acceptedReturnPath, resolveAccessDestination } from '@/features/auth/access-destination'
@@ -217,21 +218,21 @@ export default function LoginScreen() {
           >
             <Text className="font-inter-500 text-[14px] leading-[20px] text-[#120F18]">¿Olvidaste tu contraseña?</Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ busy: submitting, disabled: paleSubmit }}
+          <Button
+            loading={submitting}
+            loadingLabel="Ingresando…"
             disabled={paleSubmit}
             onPress={() => {
               void form.handleSubmit(onSubmit)()
             }}
-            className={`mt-[16px] h-[48px] items-center justify-center rounded-[8px] ${
+            className={`mt-[16px] h-[48px] items-center justify-center rounded-[8px] px-0 disabled:opacity-100 ${
               paleSubmit ? 'bg-[#EEF0C1]' : 'bg-[#C9CF38]'
             }`}
           >
             <Text className={`font-inter-500 text-[14px] leading-[21px] ${paleSubmit ? 'text-[#605E64]' : 'text-[#120F18]'}`}>
-              {submitting ? 'Ingresando…' : 'Iniciar sesión'}
+              Iniciar sesión
             </Text>
-          </Pressable>
+          </Button>
           <View accessibilityElementsHidden className="mt-[16px] h-[24px] flex-row items-center gap-[12px]">
             <View className="h-px flex-1 bg-[#B6B5B7]" />
             <Text className="font-sans text-[16px] leading-[24px] text-[#605E64]">o</Text>
