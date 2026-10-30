@@ -27,7 +27,9 @@ import {
   alertWarningXml,
   clubXml,
   courtXml,
+  eyeOnXml,
   eyeXml,
+  googleLabelXml,
   personXml,
 } from '@/features/auth/auth-icons'
 import { SessionUnverified } from '@/features/auth/SessionUnverified'
@@ -56,15 +58,15 @@ const bannerBox = {
 
 function LoginBanner({ tone, title, detail }: LoginNotice) {
   return (
-    <View accessibilityRole="alert" className={`mt-4 flex-row items-center gap-3 rounded-lg border p-3 ${bannerBox[tone]}`}>
-      <View className="h-6 w-6">
-        <View className="absolute left-0.5 top-0.5">
+    <View accessibilityRole="alert" className={`mt-[16px] flex-row items-center gap-[12px] rounded-[8px] border p-[12px] ${bannerBox[tone]}`}>
+      <View className="h-[24px] w-[24px]">
+        <View className="absolute left-[2px] top-[2px]">
           <SvgXml xml={bannerIcon[tone]} width={20} height={20} />
         </View>
       </View>
-      <View className="min-w-0 flex-1 gap-0.5">
-        <Text className="font-inter-600 text-sm leading-5 text-[#120F18]">{title}</Text>
-        {detail ? <Text className="font-sans text-xs leading-4 text-[#605E64]">{detail}</Text> : null}
+      <View className="min-w-0 flex-1 gap-[2px]">
+        <Text className="font-inter-600 text-[14px] leading-[20px] text-[#120F18]">{title}</Text>
+        {detail ? <Text className="font-sans text-[12px] leading-[16px] text-[#605E64]">{detail}</Text> : null}
       </View>
     </View>
   )
@@ -134,16 +136,24 @@ export default function LoginScreen() {
     >
       <ScrollView
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 24 }}
+        contentContainerStyle={{ flexGrow: 1 }}
       >
         <View className="h-[148px] items-center justify-center overflow-hidden" style={{ marginTop: insets.top }}>
-          <SvgXml xml={courtXml} width="100%" height="148" />
-          <Image source={logo} accessibilityLabel="Padel Check" className="absolute h-[91px] w-[92px]" resizeMode="contain" />
+          <SvgXml xml={courtXml} width="100%" height={172} />
+          <Image
+            source={logo}
+            accessibilityLabel="Padel Check"
+            resizeMode="contain"
+            style={{ position: 'absolute', top: 28.652, left: '50%', marginLeft: -46, width: 92, height: 90.695 }}
+          />
         </View>
-        <View className="flex-1 rounded-t-3xl bg-[#FEFEFE] px-4 pt-6">
-          <Text className="font-inter-600 text-2xl leading-8 text-[#120F18]">Iniciar sesión</Text>
+        <View
+          className="flex-1 rounded-t-[24px] bg-[#FEFEFE] px-[16px] pt-[24px]"
+          style={{ paddingBottom: Math.max(58, insets.bottom) }}
+        >
+          <Text className="font-inter-600 text-[24px] leading-[32px] text-[#120F18]">Iniciar sesión</Text>
           {formError ? <LoginBanner {...formError} /> : null}
-          <Text className="mb-2 mt-4 font-inter-500 text-sm text-[#120F18]">Email</Text>
+          <Text className="mb-[8px] mt-[16px] font-inter-500 text-[14px] leading-[20px] text-[#120F18]">Email</Text>
           <TextInput
             value={form.watch('email')}
             onChangeText={(value) => {
@@ -157,16 +167,16 @@ export default function LoginScreen() {
             textContentType="emailAddress"
             placeholder="nombre@correo.com"
             placeholderTextColor="#605E64"
-            className={`h-14 rounded-lg border px-4 font-inter-500 text-sm text-[#120F18] ${
+            className={`h-[56px] rounded-[8px] border bg-[#FEFEFE] px-[16px] font-inter-500 text-[14px] leading-[20px] text-[#120F18] ${
               emailError ? 'border-[#EF4444]' : 'border-[#929195]'
             }`}
           />
           {emailError ? (
-            <Text className="mt-2 text-right font-inter-500 text-sm leading-5 text-[#AA3030]">{emailError}</Text>
+            <Text className="text-right font-inter-500 text-[14px] leading-[20px] text-[#AA3030]">{emailError}</Text>
           ) : null}
-          <Text className="mb-2 mt-4 font-inter-500 text-sm text-[#120F18]">Contraseña</Text>
+          <Text className="mb-[8px] mt-[16px] font-inter-500 text-[14px] leading-[20px] text-[#120F18]">Contraseña</Text>
           <View
-            className={`h-14 flex-row items-center rounded-lg border px-4 ${
+            className={`h-[56px] flex-row items-center rounded-[8px] border bg-[#FEFEFE] px-[16px] ${
               passwordError ? 'border-[#EF4444]' : 'border-[#929195]'
             }`}
           >
@@ -182,26 +192,25 @@ export default function LoginScreen() {
               textContentType="password"
               placeholder="Ingresá tu contraseña"
               placeholderTextColor="#605E64"
-              className="h-14 flex-1 font-inter-500 text-sm text-[#120F18]"
+              className="h-[56px] flex-1 bg-[#FEFEFE] font-inter-500 text-[14px] leading-[20px] text-[#120F18]"
             />
             <Pressable
               accessibilityLabel={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               onPress={() => setShowPassword((value) => !value)}
             >
-              <SvgXml xml={eyeXml} width={24} height={24} />
+              <SvgXml xml={showPassword ? eyeOnXml : eyeXml} width={24} height={24} />
             </Pressable>
           </View>
           {passwordError ? (
-            <Text className="mt-2 text-right font-inter-500 text-sm leading-5 text-[#AA3030]">{passwordError}</Text>
+            <Text className="text-right font-inter-500 text-[14px] leading-[20px] text-[#AA3030]">{passwordError}</Text>
           ) : null}
           <View
             accessibilityRole="button"
             accessibilityState={{ disabled: true }}
             accessibilityLabel="¿Olvidaste tu contraseña?"
-            accessibilityHint={AUTH_COPY.registerLater}
-            className="mt-4 h-11 items-center justify-center"
+            className="mt-[16px] h-[44px] items-center justify-center"
           >
-            <Text className="font-inter-500 text-sm leading-5 text-[#605E64]">¿Olvidaste tu contraseña?</Text>
+            <Text className="font-inter-500 text-[14px] leading-[20px] text-[#120F18]">¿Olvidaste tu contraseña?</Text>
           </View>
           <Pressable
             accessibilityRole="button"
@@ -210,58 +219,50 @@ export default function LoginScreen() {
             onPress={() => {
               void form.handleSubmit(onSubmit)()
             }}
-            className={`mt-4 h-12 items-center justify-center rounded-lg ${
+            className={`mt-[16px] h-[48px] items-center justify-center rounded-[8px] ${
               paleSubmit ? 'bg-[#EEF0C1]' : 'bg-[#C9CF38]'
             }`}
           >
-            <Text className={`font-inter-500 text-sm ${paleSubmit ? 'text-[#605E64]' : 'text-[#120F18]'}`}>
+            <Text className={`font-inter-500 text-[14px] leading-[21px] ${paleSubmit ? 'text-[#605E64]' : 'text-[#120F18]'}`}>
               {submitting ? 'Ingresando…' : 'Iniciar sesión'}
             </Text>
           </Pressable>
-          <View accessibilityElementsHidden className="mt-4 h-6 flex-row items-center gap-3">
+          <View accessibilityElementsHidden className="mt-[16px] h-[24px] flex-row items-center gap-[12px]">
             <View className="h-px flex-1 bg-[#E7E7E8]" />
-            <Text className="font-sans text-base leading-6 text-[#605E64]">o</Text>
+            <Text className="font-sans text-[16px] leading-[24px] text-[#605E64]">o</Text>
             <View className="h-px flex-1 bg-[#E7E7E8]" />
           </View>
           <View
             accessibilityRole="button"
             accessibilityLabel="Continuar con Google"
-            className={`mt-4 flex-row items-center justify-center border border-[#747775] bg-white ${
-              Platform.OS === 'ios' ? 'h-11 gap-3 rounded px-4' : 'h-10 gap-2.5 rounded px-3'
+            className={`mt-[16px] h-[48px] flex-row items-center justify-center rounded-[8px] border border-[#747775] bg-white ${
+              Platform.OS === 'ios' ? 'gap-[12px] px-[16px]' : 'gap-[10px] px-[12px]'
             }`}
           >
             <Image source={googleMark} style={{ width: 20, height: 20 }} resizeMode="contain" accessible={false} />
-            <Text
-              className="text-sm font-medium leading-5 text-[#1F1F1F]"
-              style={{ fontFamily: Platform.OS === 'android' ? 'sans-serif-medium' : 'Inter_500Medium' }}
-            >
-              Continuar con Google
-            </Text>
+            <SvgXml xml={googleLabelXml} width={142.674} height={13.496} />
           </View>
-          <Text className="mt-4 font-sans text-base leading-6 text-[#605E64]">¿No tenés cuenta? Registrate como</Text>
-          <View className="mt-4 flex-row gap-3">
+          <Text className="mt-[16px] font-sans text-[16px] leading-[24px] text-[#605E64]">¿No tenés cuenta? Registrate como</Text>
+          <View className="mt-[16px] flex-row gap-[12px]">
             <View
               accessibilityRole="button"
               accessibilityState={{ disabled: true }}
               accessibilityLabel="Jugador"
-              accessibilityHint={AUTH_COPY.registerLater}
-              className="h-12 flex-1 flex-row items-center justify-center gap-2 rounded-lg border border-[#929195]"
+              className="h-[48px] flex-1 flex-row items-center justify-center gap-[8px] rounded-[8px] border border-[#929195] pl-[8px] pr-[16px]"
             >
               <SvgXml xml={personXml} width={20} height={20} />
-              <Text className="font-inter-500 text-sm text-[#120F18]">Jugador</Text>
+              <Text className="font-inter-500 text-[14px] leading-[21px] text-[#120F18]">Jugador</Text>
             </View>
             <View
               accessibilityRole="button"
               accessibilityState={{ disabled: true }}
               accessibilityLabel="Club"
-              accessibilityHint={AUTH_COPY.registerLater}
-              className="h-12 flex-1 flex-row items-center justify-center gap-2 rounded-lg border border-[#929195]"
+              className="h-[48px] flex-1 flex-row items-center justify-center gap-[8px] rounded-[8px] border border-[#929195] pl-[8px] pr-[16px]"
             >
               <SvgXml xml={clubXml} width={20} height={20.5} />
-              <Text className="font-inter-500 text-sm text-[#120F18]">Club</Text>
+              <Text className="font-inter-500 text-[14px] leading-[21px] text-[#120F18]">Club</Text>
             </View>
           </View>
-          <Text className="mt-4 font-sans text-sm text-[#605E64]">{AUTH_COPY.registerLater}</Text>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

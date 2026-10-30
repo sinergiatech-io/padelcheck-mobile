@@ -26,7 +26,6 @@ export const AUTH_COPY = {
   pending: 'Tu cuenta requiere completar la configuración.',
   emptyContext: 'No hay un contexto de acceso disponible para esta cuenta.',
   continuationLater: 'Esa continuación todavía no está disponible.',
-  registerLater: 'Todavía no está disponible.',
   retry: 'Reintentar comprobación',
   retrySession: 'Reintentar',
   backToAccess: 'Volver al acceso',
