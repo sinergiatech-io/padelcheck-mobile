@@ -52,6 +52,7 @@ function Section({ title, description, children }: { title: string; description?
 }
 
 export default function DesignSystemScreen() {
+  const [loadingPreview, setLoadingPreview] = useState(false)
   const [catA, setCatA] = useState(true)
   const [catB, setCatB] = useState(false)
   const [notif, setNotif] = useState(true)
@@ -68,6 +69,12 @@ export default function DesignSystemScreen() {
             Tokens y componentes alineados con padelcheck-fe y el Figma.
           </Text>
         </View>
+
+        <Section title="Botones en carga" description="Solo spinner durante la operación; conserva el tamaño y bloquea nuevas pulsaciones.">
+          <Button className="w-full" loading={loadingPreview} disabled={false} loadingLabel="Guardando…"
+            onPress={() => setLoadingPreview(true)}>Guardar cambios</Button>
+          <Button variant="secondary" onPress={() => setLoadingPreview(false)}>Restablecer ejemplo</Button>
+        </Section>
 
         <Section title="Colores" description="Referencia rápida (hex).">
           <View className="flex flex-row flex-wrap gap-3">
