@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthContext'
 import { SessionUnverified } from '@/features/auth/SessionUnverified'
 import { EFFECTIVE_HELP, TYPE_HELP, example, optionLabel } from './category-policy'
 import { useCategoryPolicy } from './use-category-policy'
+import { ClubBottomNav } from './ClubBottomNav'
 
 const icons = {
   chevron: Image.resolveAssetSource(require('@/assets/category-policy/chevron.svg'))?.uri ?? '',
@@ -96,10 +97,7 @@ export function CategoryPolicyScreen() {
           {policy.loadError ? <Button accessibilityLabel="Reintentar" style={{ height: 48, borderRadius: 8 }} onPress={() => void policy.reload()}><Text style={styles.label} className="font-inter-500">Reintentar</Text></Button> :
           <Button accessibilityLabel="Guardar cambios" style={{ height: 48, borderRadius: 8 }} className={`disabled:opacity-100 ${!policy.dirty && !policy.saving ? 'bg-[#eef0c1]' : ''}`} loading={policy.saving} loadingLabel="Guardando…" disabled={!policy.dirty} onPress={() => void policy.save()}><Text style={[styles.label, { color: !policy.dirty ? '#605e64' : '#120f18' }]} className="font-inter-500">Guardar cambios</Text></Button>}
         </View>}
-        {/* KAN-134 integrates the full global menu with this return contract. */}
-        <View style={{ paddingBottom: insets.bottom }} className="bg-dark-900">
-          <Pressable accessibilityRole="button" accessibilityLabel="Volver a Mi Club" onPress={back} disabled={policy.saving} style={{ height: 64 }} className="items-center justify-center"><Text style={styles.caption} className="font-inter-400 text-primary-500">Mi Club</Text></Pressable>
-        </View>
+        <ClubBottomNav onDashboard={back} onClub={back} busy={policy.saving} bottomInset={insets.bottom} />
       </View>
       <Modal transparent statusBarTranslucent navigationBarTranslucent visible={options} animationType="none" onRequestClose={() => setOptions(false)}>
         <Pressable accessibilityLabel="Cerrar opciones" onPress={() => setOptions(false)} className="flex-1" style={{ paddingTop: menuTop, paddingHorizontal: 16 }}>
