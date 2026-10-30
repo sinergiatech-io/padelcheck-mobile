@@ -13,6 +13,7 @@ import * as SecureStore from 'expo-secure-store'
 import { fetchCurrentUser } from '@/features/auth/api/me'
 import { resolveAccessDestination, type AccessDestination } from '@/features/auth/access-destination'
 import { rememberExpiredLoginNotice } from '@/features/auth/login-notice'
+import { decideSessionCheck } from '@/features/auth/session-check'
 import { bumpSessionGeneration, currentSessionGeneration } from '@/features/auth/session-generation'
 import { ApiError } from '@/lib/api-client'
 import { clearStoredToken, getStoredToken, setStoredToken } from '@/lib/auth'
@@ -105,21 +106,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ phase: 'anonymous', user: null, token: null, expiresAt: null })
   }, [])
 
-  const validate = useCallback(async (generation: number, token: string, expiresAt: number | null) => {
+  const validate = useCallback(async (token: string, expiresAt: number | null) => {
+    const generation = bumpSessionGeneration()
     if (expiresAt !== null && Date.now() >= expiresAt) {
-      if (generation !== currentSessionGeneration()) return
+      if (decideSessionCheck({ attempt: generation, current: currentSessionGeneration(), error: null }) !== 'ready') return
       await logout('expired')
       return
     }
     try {
       const user = await fetchCurrentUser()
-      if (generation !== currentSessionGeneration()) return
+      if (decideSessionCheck({ attempt: generation, current: currentSessionGeneration(), error: null }) !== 'ready') return
       await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user))
-      if (generation !== currentSessionGeneration()) return
+      if (decideSessionCheck({ attempt: generation, current: currentSessionGeneration(), error: null }) !== 'ready') return
       setState({ phase: 'ready', user, token, expiresAt })
     } catch (error) {
-      if (generation !== currentSessionGeneration()) return
-      if (error instanceof ApiError && error.status === 401) {
+      const decision = decideSessionCheck({
+        attempt: generation,
+        current: currentSessionGeneration(),
+        error: error instanceof ApiError ? error : { status: 0 },
+      })
+      if (decision === 'ignore') return
+      if (decision === 'expired') {
         await logout('expired')
         return
       }
@@ -150,15 +157,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const retryValidation = useCallback(() => {
+    const generation = bumpSessionGeneration()
     void (async () => {
       const token = await getStoredToken()
+      if (generation !== currentSessionGeneration()) return
       if (!token) {
         await logout()
         return
       }
-      const generation = currentSessionGeneration()
       setState((current) => ({ ...current, phase: 'checking' }))
-      await validate(generation, token, await readExpires())
+      await validate(token, await readExpires())
     })()
   }, [logout, validate])
 
@@ -173,8 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!cancelled) setState({ phase: 'anonymous', user: null, token: null, expiresAt: null })
         return
       }
-      const generation = currentSessionGeneration()
-      await validate(generation, token, await readExpires())
+      await validate(token, await readExpires())
     })()
     return () => {
       cancelled = true
@@ -186,9 +193,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (next !== 'active') return
       const current = stateRef.current
       if (current.phase !== 'ready' || !current.token) return
-      const generation = currentSessionGeneration()
       setState((value) => ({ ...value, phase: 'checking' }))
-      void validate(generation, current.token as string, current.expiresAt)
+      void validate(current.token as string, current.expiresAt)
     })
     return () => subscription.remove()
   }, [validate])
@@ -217,9 +223,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error.status === 403 && error.code === 'AUTH_FORBIDDEN' && !path.includes('/auth/me')) {
         const current = stateRef.current
         if (current.phase !== 'ready' || !current.token) return
-        const generation = currentSessionGeneration()
         setState((value) => ({ ...value, phase: 'checking' }))
-        void validate(generation, current.token, current.expiresAt)
+        void validate(current.token as string, current.expiresAt)
       }
     })
     return () => setHttpErrorListener(null)
