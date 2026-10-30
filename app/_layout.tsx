@@ -1,6 +1,6 @@
 import '../global.css'
 import { useEffect } from 'react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import {
   useFonts,
   Inter_400Regular,
@@ -13,13 +13,7 @@ import { View, ActivityIndicator } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { AuthProvider } from '@/context/AuthContext'
 import { API_BASE } from '@/lib/constants'
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    mutations: { retry: false },
-    queries: { retry: 1, refetchOnWindowFocus: false },
-  },
-})
+import { queryClient } from '@/lib/query-client'
 
 export default function RootLayout() {
   useEffect(() => {

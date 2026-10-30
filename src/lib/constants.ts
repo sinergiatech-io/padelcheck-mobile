@@ -8,6 +8,7 @@ export const APP_NAME = 'Padel Check'
 export const ROUTES = {
   home: '/',
   login: '/login',
+  authContinue: '/auth-continue',
   register: '/register',
   designSystem: '/design-system',
   dashboard: '/dashboard',
