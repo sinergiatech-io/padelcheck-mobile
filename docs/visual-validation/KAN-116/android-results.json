@@ -1,0 +1,18 @@
+{
+  "checks": [
+    "login entry",
+    "required sex",
+    "selectors",
+    "keyboard",
+    "scroll",
+    "real API and SMTP",
+    "resend",
+    "old link invalid",
+    "verification",
+    "activation",
+    "real login"
+  ],
+  "runtime": "Android API 36, Expo Go SDK 58, 1080x2340, density 440",
+  "passed": true,
+  "limitation": "Expo Go links use exp:// transport. Standalone padelcheck:// and iOS runtime remain pending."
+}
