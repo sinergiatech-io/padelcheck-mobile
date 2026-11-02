@@ -1,3 +1,4 @@
+import { StartupReady } from '@/features/startup/StartupReady'
 import { router } from 'expo-router'
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native'
 import { Button } from '@/components/ui/button'
@@ -15,7 +16,7 @@ import { ROUTES } from '@/lib/constants'
 
 export default function RegisterScreen() {
   return (
-    <KeyboardAvoidingView
+    <StartupReady><KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       className="flex-1 bg-background"
     >
@@ -73,6 +74,6 @@ export default function RegisterScreen() {
           </CardFooter>
         </Card>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoidingView></StartupReady>
   )
 }

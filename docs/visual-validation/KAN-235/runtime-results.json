@@ -1,0 +1,85 @@
+{
+  "faultSuites": [
+    {
+      "name": "release login, saved native session and cold restore",
+      "passed": true,
+      "elapsedMs": 21783
+    },
+    {
+      "name": "foreground revalidation ends in session recovery on 503; retry retains session",
+      "passed": true,
+      "elapsedMs": 7058
+    },
+    {
+      "name": "native storage read error, busy retry, repeated failure and retained exit",
+      "passed": true,
+      "elapsedMs": 16497
+    },
+    {
+      "name": "failed native deletion never reports logout success; recovery can validate again",
+      "passed": true,
+      "elapsedMs": 9484
+    },
+    {
+      "name": "corrupt cache is not authority; corrupt expiry and failed writes remain recoverable",
+      "passed": true,
+      "elapsedMs": 22443
+    },
+    {
+      "name": "font rejection and stuck font loading reach an operable system-font destination",
+      "passed": true,
+      "elapsedMs": 8430
+    },
+    {
+      "name": "network interruption and the unchanged ten-second deadline keep retry and session",
+      "passed": true,
+      "elapsedMs": 24390
+    },
+    {
+      "name": "protected deep link and public deep link retain the requested destination",
+      "passed": true,
+      "elapsedMs": 8624
+    },
+    {
+      "name": "401 retires stored access and returns to login",
+      "passed": true,
+      "elapsedMs": 7714
+    },
+    {
+      "name": "boot watchdog presents recovery and retry returns to original route",
+      "passed": true,
+      "elapsedMs": 38295
+    }
+  ],
+  "finalQa": [
+    {
+      "name": "final recovery styling, spinner geometry and explicit failed deletion",
+      "passed": true,
+      "elapsedMs": 36565
+    }
+  ],
+  "supplemental": [
+    {
+      "name": "compact 360x720 text 200 percent: recovery scroll and both actions remain reachable",
+      "passed": true,
+      "elapsedMs": 19635
+    },
+    {
+      "name": "known expiration and final 401 never authorize a protected screen",
+      "passed": true,
+      "elapsedMs": 44146
+    }
+  ],
+  "cleanRelease": [
+    {
+      "name": "final uninstrumented release cold launch and first usable login",
+      "passed": true,
+      "elapsedMs": 4671
+    },
+    {
+      "name": "final release public deep link, warm foreground and navigation",
+      "passed": true,
+      "elapsedMs": 7029
+    }
+  ]
+}

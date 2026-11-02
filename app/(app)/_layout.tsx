@@ -1,3 +1,4 @@
+import { StartupReady } from '@/features/startup/StartupReady'
 import { Redirect, Tabs, usePathname } from 'expo-router'
 import { ActivityIndicator, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -122,5 +123,8 @@ export default function AppGroupLayout() {
   const redirect = guardRedirect('native', destination, pathname)
   if (redirect) return <Redirect href={redirect} />
 
-  return <AppTabs mode={destination.kind === 'club' ? 'club' : 'player'} />
+  const redirectPath = /\/events\/[^/]+\/(registrations|qualifier|brackets|enroll)$/.test(pathname)
+    || /\/categories\/[^/]+(?:\/enroll)?$/.test(pathname)
+    || (/\/categories\/[^/]+\/[^/]+$/.test(pathname) && !/\/(inscripciones|clasificatoria|cuadros|partidos)$/.test(pathname))
+  return <StartupReady enabled={!redirectPath}><AppTabs mode={destination.kind === 'club' ? 'club' : 'player'} /></StartupReady>
 }

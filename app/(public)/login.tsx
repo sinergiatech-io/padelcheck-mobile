@@ -1,3 +1,4 @@
+import { StartupReady } from '@/features/startup/StartupReady'
 import { useRef, useState } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Redirect, router, useLocalSearchParams } from 'expo-router'
@@ -131,7 +132,7 @@ export default function LoginScreen() {
   const passwordError = form.formState.errors.password?.message
 
   return (
-    <KeyboardAvoidingView
+    <StartupReady><KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       className="flex-1 bg-[#120F18]"
     >
@@ -271,6 +272,6 @@ export default function LoginScreen() {
           </View>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoidingView></StartupReady>
   )
 }

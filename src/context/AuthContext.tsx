@@ -19,6 +19,7 @@ import { ApiError } from '@/lib/api-client'
 import { clearStoredToken, getStoredToken, setStoredToken } from '@/lib/auth'
 import { setHttpErrorListener } from '@/lib/http-client'
 import { queryClient } from '@/lib/query-client'
+import { StorageUnavailableError, withStorageDeadline } from '@/lib/storage-deadline'
 import type { AuthPrincipal } from '@/types/auth'
 
 export type SessionPhase = 'checking' | 'anonymous' | 'ready' | 'unverified'
@@ -32,8 +33,9 @@ interface AuthState {
 
 interface AuthContextValue extends AuthState {
   login: (token: string, user: AuthPrincipal, expiresIn: number) => Promise<boolean>
-  logout: (notice?: 'expired') => Promise<void>
-  retryValidation: () => void
+  logout: (notice?: 'expired') => Promise<boolean>
+  retryValidation: () => Promise<void>
+  storageError: boolean
   isAuthenticated: boolean
   isLoading: boolean
   destination: AccessDestination | null
@@ -44,43 +46,22 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 const USER_KEY = 'padelcheck_user'
 const EXPIRES_KEY = 'padelcheck_session_expires_at'
 
-async function readUser(): Promise<AuthPrincipal | null> {
-  try {
-    const raw = await SecureStore.getItemAsync(USER_KEY)
-    return raw ? (JSON.parse(raw) as AuthPrincipal) : null
-  } catch {
-    return null
-  }
-}
-
 async function readExpires(): Promise<number | null> {
-  try {
-    const raw = await SecureStore.getItemAsync(EXPIRES_KEY)
-    if (!raw) return null
-    const value = Number(raw)
-    return Number.isFinite(value) ? value : null
-  } catch {
-    return null
-  }
+  const raw = await withStorageDeadline(() => SecureStore.getItemAsync(EXPIRES_KEY))
+  if (!raw) return null
+  const value = Number(raw)
+  if (!Number.isFinite(value)) throw new StorageUnavailableError()
+  return value
 }
 
 async function clearPrivateSession() {
-  try {
-    await clearStoredToken()
-  } catch {
-    /* token may already be absent */
-  }
-  try {
-    await SecureStore.deleteItemAsync(USER_KEY)
-  } catch {
-    /* key may already be absent */
-  }
-  try {
-    await SecureStore.deleteItemAsync(EXPIRES_KEY)
-  } catch {
-    /* key may already be absent */
-  }
   queryClient.clear()
+  const results = await Promise.allSettled([
+    clearStoredToken(),
+    withStorageDeadline(() => SecureStore.deleteItemAsync(USER_KEY)),
+    withStorageDeadline(() => SecureStore.deleteItemAsync(EXPIRES_KEY)),
+  ])
+  if (results.some(result => result.status === 'rejected')) throw new StorageUnavailableError()
 }
 
 function errorPath(error: ApiError): string {
@@ -98,16 +79,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
   const stateRef = useRef(state)
   stateRef.current = state
+  const [storageError, setStorageError] = useState(false)
+  const restoreFlight = useRef<Promise<void> | null>(null)
 
   const logout = useCallback(async (notice?: 'expired') => {
     bumpSessionGeneration()
-    await clearPrivateSession()
+    // Retire in-memory authorization immediately, even if native deletion fails.
+    setState(current => ({ phase: current.phase === 'unverified' ? 'unverified' : 'checking', user: null, token: null, expiresAt: null }))
+    try {
+      await clearPrivateSession()
+    } catch {
+      setStorageError(true)
+      setState({ phase: 'unverified', user: null, token: null, expiresAt: null })
+      return false
+    }
+    setStorageError(false)
     if (notice === 'expired') rememberExpiredLoginNotice()
     setState({ phase: 'anonymous', user: null, token: null, expiresAt: null })
+    return true
   }, [])
 
-  const validate = useCallback(async (token: string, expiresAt: number | null) => {
-    const generation = bumpSessionGeneration()
+  const validate = useCallback(async (token: string, expiresAt: number | null, generation = bumpSessionGeneration()) => {
     if (expiresAt !== null && Date.now() >= expiresAt) {
       if (decideSessionCheck({ attempt: generation, current: currentSessionGeneration(), error: null }) !== 'ready') return
       await logout('expired')
@@ -116,8 +108,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const user = await fetchCurrentUser()
       if (decideSessionCheck({ attempt: generation, current: currentSessionGeneration(), error: null }) !== 'ready') return
-      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user))
+      await withStorageDeadline(() => SecureStore.setItemAsync(USER_KEY, JSON.stringify(user)))
       if (decideSessionCheck({ attempt: generation, current: currentSessionGeneration(), error: null }) !== 'ready') return
+      setStorageError(false)
       setState({ phase: 'ready', user, token, expiresAt })
     } catch (error) {
       const decision = decideSessionCheck({
@@ -130,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await logout('expired')
         return
       }
+      setStorageError(error instanceof StorageUnavailableError)
       setState({ phase: 'unverified', user: null, token, expiresAt })
     }
   }, [logout])
@@ -138,55 +132,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const generation = bumpSessionGeneration()
     const expiresAt = Number.isFinite(expiresIn) && expiresIn > 0 ? Date.now() + expiresIn * 1000 : null
     await setStoredToken(token)
-    await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user))
+    await withStorageDeadline(() => SecureStore.setItemAsync(USER_KEY, JSON.stringify(user)))
     if (expiresAt === null) {
       try {
-        await SecureStore.deleteItemAsync(EXPIRES_KEY)
+        await withStorageDeadline(() => SecureStore.deleteItemAsync(EXPIRES_KEY))
       } catch {
         /* absent expiry is valid */
       }
     } else {
-      await SecureStore.setItemAsync(EXPIRES_KEY, String(expiresAt))
+      await withStorageDeadline(() => SecureStore.setItemAsync(EXPIRES_KEY, String(expiresAt)))
     }
     if (generation !== currentSessionGeneration()) {
       await clearPrivateSession()
       return false
     }
+    setStorageError(false)
     setState({ phase: 'ready', user, token, expiresAt })
     return true
   }, [])
 
   const retryValidation = useCallback(() => {
+    if (restoreFlight.current) return restoreFlight.current
     const generation = bumpSessionGeneration()
-    void (async () => {
-      const token = await getStoredToken()
-      if (generation !== currentSessionGeneration()) return
-      if (!token) {
-        await logout()
-        return
+    const flight = (async () => {
+      try {
+        const [token, expiresAt] = await Promise.all([getStoredToken(), readExpires()])
+        if (generation !== currentSessionGeneration()) return
+        if (!token) {
+          await logout()
+          return
+        }
+        // During a recovery retry keep its actions mounted and busy; protected content stays blocked.
+        setState(current => ({ ...current, phase: current.phase === 'unverified' ? 'unverified' : 'checking' }))
+        await validate(token, expiresAt, generation)
+      } catch {
+        if (generation !== currentSessionGeneration()) return
+        setStorageError(true)
+        setState({ phase: 'unverified', user: null, token: null, expiresAt: null })
       }
-      setState((current) => ({ ...current, phase: 'checking' }))
-      await validate(token, await readExpires())
     })()
+    restoreFlight.current = flight
+    void flight.finally(() => { if (restoreFlight.current === flight) restoreFlight.current = null })
+    return flight
   }, [logout, validate])
 
   useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      const token = await getStoredToken()
-      const storedUser = await readUser()
-      if (cancelled) return
-      if (!token || !storedUser) {
-        await clearPrivateSession()
-        if (!cancelled) setState({ phase: 'anonymous', user: null, token: null, expiresAt: null })
-        return
-      }
-      await validate(token, await readExpires())
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [validate])
+    // A missing/corrupt cached principal is not authority; /me validates the token.
+    void retryValidation()
+    return () => { bumpSessionGeneration(); restoreFlight.current = null }
+  }, [retryValidation])
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (next) => {
@@ -239,10 +233,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     logout,
     retryValidation,
+    storageError,
     isAuthenticated: state.phase === 'ready' && !!state.token && !!state.user,
     isLoading: state.phase === 'checking',
     destination,
-  }), [destination, login, logout, retryValidation, state])
+  }), [destination, login, logout, retryValidation, state, storageError])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
