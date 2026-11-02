@@ -20,13 +20,43 @@ Sexo, Damas/6ta selection, start, resend, rejection of replaced link, valid emai
 proof, atomic activation, return to login and successful player login.
 
 Expo Go transports verification links through `exp://host/--/register/player/verify`.
-The app's standalone `padelcheck://register/player/verify` configuration is in
-`app.json`, but this run does not certify standalone Android/iOS link opening.
-Opening a replacement email while verification is mounted recreates its proof
-state; no stale prior link is reused.
+That run does not certify standalone scheme handling. Opening a replacement
+email while verification is mounted recreates its proof state; no stale prior
+link is reused.
 
-Checks: native typecheck, HTTP/session tests and the iOS bundle export pass. iOS source is included with
-safe-area and KeyboardAvoidingView behavior, but iOS device/simulator runtime,
-keyboard, visuals and standalone link opening remain unverified on Windows.
-These AC must remain open until actual platform verification; do not accept them
-based on Android, web or a bundle export.
+## Standalone Android release — 02/11/2026
+
+A current-source release APK was built and installed on `emulator-5556`
+(`PadelCheck_API_36`). It does not use Expo Go or Metro. Package
+`io.sinergiatech.padelcheck.mobile`, scheme `padelcheck`. `cmd package
+resolve-activity` selects `io.sinergiatech.padelcheck.mobile/.MainActivity` for
+`padelcheck://register/player/verify`. The JS bundle calls the local API at
+`http://10.0.2.2:8080/api`. The generated release manifest allows cleartext for
+that local API; `android/` stays gitignored and this APK is not a store build.
+Launch the installed app with:
+
+```
+adb -s emulator-5556 shell am start -n io.sinergiatech.padelcheck.mobile/.MainActivity
+```
+
+The synthetic registration used a reserved `example.invalid` address. The
+delivered Gmail message for that Android registration contained
+`padelcheck://register/player/verify` with the original account email. With the
+app in the foreground, the replaced link opened **Enlace no válido** and the
+current link opened **Email verificado**. After force-stop, the same current
+link cold-started the installed app on **Email verificado**. Activation created
+one active player (Damas / 6ta) and login reached **Eventos**. These opens were
+Android `VIEW` intents of the URL read from the delivered message. They are not
+a tap inside Gmail: the emulator has no Google account, and the agent browser
+was signed out. iOS is not verified by this Android evidence.
+
+Status bar inset is 136 px and the navigation bar is 66 px at density 440.
+Each is applied once. With the keyboard open, the focused Contraseña field stays
+fully above it; the earlier release kept that field covered because the focus
+scroll ran before the keyboard inset existed. Scroll still reaches **Crear cuenta**
+when the keyboard is closed.
+
+Checks: native typecheck passes. iOS source is included with safe-area and
+KeyboardAvoidingView behavior, but iOS device/simulator runtime, keyboard,
+visuals and standalone link opening remain unverified on Windows. Do not accept
+those AC from Android, web or a bundle export.
