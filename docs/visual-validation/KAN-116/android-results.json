@@ -1,18 +1,43 @@
 {
-  "checks": [
-    "login entry",
-    "required sex",
-    "selectors",
-    "keyboard",
-    "scroll",
-    "real API and SMTP",
-    "resend",
-    "old link invalid",
-    "verification",
-    "activation",
-    "real login"
-  ],
-  "runtime": "Android API 36, Expo Go SDK 58, 1080x2340, density 440",
-  "passed": true,
-  "limitation": "Expo Go links use exp:// transport. Standalone padelcheck:// and iOS runtime remain pending."
+  "expoGo": {
+    "passed": true,
+    "runtime": "Android API 36, Expo Go SDK 58, 1080x2340, density 440",
+    "checks": [
+      "login entry",
+      "required sex",
+      "selectors",
+      "keyboard",
+      "scroll",
+      "real API and SMTP",
+      "resend",
+      "old link invalid",
+      "verification",
+      "activation",
+      "real login"
+    ],
+    "limitation": "Expo Go links use exp:// transport and do not certify padelcheck://."
+  },
+  "standalone": {
+    "passed": true,
+    "runtime": "Android API 36 emulator-5556, release APK, no Expo Go, no Metro, 1080x2340, density 440",
+    "package": "io.sinergiatech.padelcheck.mobile",
+    "schemeActivity": "io.sinergiatech.padelcheck.mobile/.MainActivity",
+    "api": "http://10.0.2.2:8080/api",
+    "insetsPx": { "statusBars": 136, "navigationBars": 66 },
+    "linkSource": "URL taken from the delivered Gmail message and opened with an adb VIEW intent.",
+    "checks": [
+      "installed release launch",
+      "registration form",
+      "keyboard focus visible",
+      "scroll to create account",
+      "real API and SMTP",
+      "resend",
+      "replaced link invalid while app is open",
+      "current link verifies while app is open",
+      "current link verifies after force-stop",
+      "activation",
+      "real login to Eventos"
+    ],
+    "limitation": "No tap inside the Gmail client was performed. iOS runtime remains unverified."
+  }
 }
