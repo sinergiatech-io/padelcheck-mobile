@@ -1,3 +1,4 @@
+import { StartupReady } from '@/features/startup/StartupReady'
 import { useState } from 'react'
 import { ScrollView, Text, View } from 'react-native'
 import { Bell, Calendar, Mail, MapPin, Search, Trophy, Users } from 'lucide-react-native'
@@ -60,7 +61,7 @@ export default function DesignSystemScreen() {
   const [cat, setCat] = useState('a')
 
   return (
-    <ScrollView className="flex-1 bg-background px-4 py-10">
+    <StartupReady><ScrollView className="flex-1 bg-background px-4 py-10">
       <View className="mx-auto w-full max-w-xl gap-12 pb-24">
         <View>
           <Text className="font-inter-500 text-caption uppercase text-dark-700">Padel Check</Text>
@@ -240,6 +241,6 @@ export default function DesignSystemScreen() {
           </Card>
         </Section>
       </View>
-    </ScrollView>
+    </ScrollView></StartupReady>
   )
 }

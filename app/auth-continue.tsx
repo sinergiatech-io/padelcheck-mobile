@@ -1,3 +1,4 @@
+import { StartupReady } from '@/features/startup/StartupReady'
 import { useEffect } from 'react'
 import { BackHandler, Pressable, Text, View } from 'react-native'
 import { Redirect, Stack } from 'expo-router'
@@ -29,7 +30,7 @@ export default function AuthContinueScreen() {
   }
 
   return (
-    <View className="flex-1 justify-center bg-[#FEFEFE] px-4" style={{ paddingTop: insets.top, paddingBottom: insets.bottom + 24 }}>
+    <StartupReady><View className="flex-1 justify-center bg-[#FEFEFE] px-4" style={{ paddingTop: insets.top, paddingBottom: insets.bottom + 24 }}>
       <Stack.Screen options={{ gestureEnabled: false, headerShown: false }} />
       <Text className="font-inter-600 text-2xl leading-8 text-[#120F18]">{message.title}</Text>
       {message.detail ? <Text className="mt-3 font-sans text-base leading-6 text-[#605E64]">{message.detail}</Text> : null}
@@ -42,6 +43,6 @@ export default function AuthContinueScreen() {
       >
         <Text className="font-inter-500 text-sm text-[#120F18]">{AUTH_COPY.backToAccess}</Text>
       </Pressable>
-    </View>
+    </View></StartupReady>
   )
 }

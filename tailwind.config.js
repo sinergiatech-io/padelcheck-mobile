@@ -6,10 +6,10 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter_400Regular'],
-        'inter-500': ['Inter_500Medium'],
-        'inter-600': ['Inter_600SemiBold'],
-        'inter-700': ['Inter_700Bold'],
+        sans: ['var(--font-regular)'],
+        'inter-500': ['var(--font-medium)'],
+        'inter-600': ['var(--font-semibold)'],
+        'inter-700': ['var(--font-bold)'],
         mono: ['ui-monospace', 'monospace'],
       },
       colors: {

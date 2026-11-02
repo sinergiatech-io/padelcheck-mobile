@@ -1,3 +1,4 @@
+import { StartupReady } from '@/features/startup/StartupReady'
 import { useEffect, useRef, useState, type ComponentRef } from 'react'
 import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import { SvgUri } from 'react-native-svg'
@@ -61,7 +62,7 @@ export function CategoryPolicyScreen() {
   if (destination?.kind !== 'club') return <Redirect href="/events" />
   const back = () => router.replace('/dashboard')
   return (
-    <SafeAreaView edges={['top']} className="flex-1 bg-[#100e16]">
+    <StartupReady><SafeAreaView edges={['top']} className="flex-1 bg-[#100e16]">
       <StatusBar style="light" />
       <View className="flex-1 bg-background">
         <View style={{ height: 56, paddingHorizontal: 16 }} className="flex-row items-center bg-[#100e16]">
@@ -108,7 +109,7 @@ export function CategoryPolicyScreen() {
           </View>
         </Pressable>
       </Modal>
-    </SafeAreaView>
+    </SafeAreaView></StartupReady>
   )
 }
 
