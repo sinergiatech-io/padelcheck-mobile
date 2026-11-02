@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native'
+import { Keyboard, Modal, Pressable, ScrollView, Text, View, type PressableProps } from 'react-native'
 import { ChevronDown } from 'lucide-react-native'
 import { cn } from '@/lib/utils'
 
@@ -41,27 +41,28 @@ export function Select({
   return <SelectCtx.Provider value={ctx}>{children}</SelectCtx.Provider>
 }
 
-export function SelectTrigger({ className, children }: { className?: string; children?: React.ReactNode }) {
+export function SelectTrigger({ className, children, indicator, ...props }: PressableProps & { children?: React.ReactNode; indicator?: React.ReactNode }) {
   const { setOpen } = useSelect()
   return (
     <Pressable
-      onPress={() => setOpen(true)}
+      {...props}
+      onPress={() => { Keyboard.dismiss(); setOpen(true) }}
       className={cn(
         'flex h-9 w-full flex-row items-center justify-between rounded-md border border-divider bg-surface px-3',
         className,
       )}
     >
       {children}
-      <ChevronDown size={16} color="#6b7280" />
+      {indicator ?? <ChevronDown size={16} color="#6b7280" />}
     </Pressable>
   )
 }
 
-export function SelectValue({ placeholder }: { placeholder?: string }) {
+export function SelectValue({ placeholder, className }: { placeholder?: string; className?: string }) {
   const { value, labels } = useSelect()
   const label = value != null ? labels[value] : undefined
   return (
-    <Text className="font-sans text-sm text-dark-900" numberOfLines={1}>
+    <Text className={cn('font-sans text-sm text-dark-900', className)} numberOfLines={1}>
       {label ?? placeholder ?? ''}
     </Text>
   )
@@ -88,6 +89,8 @@ export function SelectItem({ value, children }: { value: string; children: strin
   const active = selected === value
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
       onPress={() => {
         onValueChange?.(value)
         setOpen(false)

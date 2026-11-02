@@ -251,15 +251,15 @@ export default function LoginScreen() {
           </View>
           <Text className="mt-[16px] font-sans text-[16px] leading-[24px] text-[#605E64]">¿No tenés cuenta? Registrate como</Text>
           <View className="mt-[16px] flex-row gap-[12px]">
-            <View
+            <Pressable
               accessibilityRole="button"
-              accessibilityState={{ disabled: true }}
               accessibilityLabel="Jugador"
+              onPress={() => router.push({ pathname: '/register/player', params: params.returnUrl ? { returnUrl: params.returnUrl } : {} })}
               className="h-[48px] flex-1 flex-row items-center justify-center gap-[8px] rounded-[8px] border border-[#929195] pl-[8px] pr-[16px]"
             >
               <SvgXml xml={personXml} width={20} height={20} />
               <Text className="font-inter-500 text-[14px] leading-[21px] text-[#120F18]">Jugador</Text>
-            </View>
+            </Pressable>
             <View
               accessibilityRole="button"
               accessibilityState={{ disabled: true }}
