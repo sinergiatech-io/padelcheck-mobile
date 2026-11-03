@@ -12,7 +12,8 @@
     "test:http": "node scripts/test-http.cjs",
     "test:session": "node scripts/test-session.cjs",
     "test:startup": "node scripts/test-startup.cjs",
-    "smoke:http": "node scripts/test-http.cjs --smoke"
+    "smoke:http": "node scripts/test-http.cjs --smoke",
+    "test:recovery": "node scripts/test-recovery.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",

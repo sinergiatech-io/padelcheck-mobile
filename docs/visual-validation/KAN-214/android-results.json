@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "runtime": "installed standalone local release APK, Android API 36, 1080x2340 density 440",
+  "backend": "integrated contract v1.1, isolated PostgreSQL schema, local SMTP",
+  "checks": [
+    "login entry, validation, real generic request and keyboard",
+    "reset real API/local SMTP, installed cold/warm, Save, new login, used link, return",
+    "first-password real API/local SMTP, installed cold/warm, Save, new login, used link, return",
+    "new warm link replaces already-open proof and server capability",
+    "cold missing proof unavailable"
+  ]
+}
