@@ -211,14 +211,14 @@ export default function LoginScreen() {
           {passwordError ? (
             <Text className="text-right font-inter-500 text-[14px] leading-[20px] text-[#AA3030]">{passwordError}</Text>
           ) : null}
-          <View
+          <Pressable
+            onPress={() => router.push('/forgot-password')}
             accessibilityRole="button"
-            accessibilityState={{ disabled: true }}
             accessibilityLabel="¿Olvidaste tu contraseña?"
             className="mt-[16px] h-[44px] items-center justify-center"
           >
             <Text className="font-inter-500 text-[14px] leading-[20px] text-[#120F18]">¿Olvidaste tu contraseña?</Text>
-          </View>
+          </Pressable>
           <Button
             loading={submitting}
             loadingLabel="Ingresando…"

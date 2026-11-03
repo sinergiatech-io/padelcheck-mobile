@@ -12,6 +12,7 @@ export type ApiErrorKind = 'http' | 'network' | 'cancelled' | 'timeout' | 'inval
 
 export class ApiError extends Error {
   readonly code?: string
+  retryAfterMs?: number
 
   constructor(
     message: string,
@@ -101,6 +102,12 @@ export function createApiClient({ baseUrl, getToken, credentials }: ClientConfig
           message = payload.message
         }
         const httpError = new ApiError(message, response.status, payload)
+        const retry = response.headers.get('Retry-After')
+        if (retry) {
+          const seconds = Number(retry)
+          const delay = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(retry) - Date.now()
+          if (Number.isFinite(delay)) httpError.retryAfterMs = Math.max(0, delay)
+        }
         notifyHttpError(httpError)
         throw httpError
       }

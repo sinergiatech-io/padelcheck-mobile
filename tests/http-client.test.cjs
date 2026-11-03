@@ -143,3 +143,14 @@ test('environment base normalized; validation/production never fall back to loca
     assert.throws(() => resolveApiBase(raw, false, ''))
   }
 })
+
+ test('429 exposes numeric/date Retry-After and public recovery omits session credentials', async () => {
+  for (const retry of ['60', new Date(Date.now()+60000).toUTCString()]) {
+    global.fetch = async (_url, init) => {
+      assert.equal(init.credentials, 'omit'); assert.equal(init.headers.get('Authorization'), null);
+      return new Response('{}', {status:429, headers:{'content-type':'application/json','Retry-After':retry}});
+    };
+    const api=createApiClient({baseUrl:'https://api.example/api',getToken:()=>null,credentials:'omit'});
+    await assert.rejects(api.post('/auth/password-recovery/inspect', {}), error => error.status===429 && error.retryAfterMs>58000 && error.retryAfterMs<=60000);
+  }
+});

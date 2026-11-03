@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "source": "final revision; unused listener removed after full suite",
+  "runtime": "installed standalone release APK, embedded Hermes, no Metro/Expo Go",
+  "geometry": {
+    "physical": "1206x2622",
+    "density": 480,
+    "logical": "402x874"
+  },
+  "checks": [
+    "cold request",
+    "cold reset",
+    "warm first-password replacement",
+    "keyboard and Save",
+    "success"
+  ]
+}
