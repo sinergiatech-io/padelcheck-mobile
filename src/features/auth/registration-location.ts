@@ -16,7 +16,7 @@ export interface PositionProvider {
   position(signal: AbortSignal): Promise<Point>
 }
 export type LocationState = {
-  mode: 'choice' | 'detecting' | 'resolved' | 'manual'
+  mode: 'form' | 'detecting'
   problem?: LocationProblem
   provinces: Province[]
   province: Province | null
@@ -24,15 +24,13 @@ export type LocationState = {
   selection: ResolvedLocation | null
   provinceStatus: 'idle' | 'loading' | 'ready' | 'error'
   localityStatus: 'idle' | 'loading' | 'ready' | 'error'
-  query: string
-  page: number
-  total: number
   errors: { province?: string; locality?: string }
 }
-const initialState = (): LocationState => ({ mode: 'choice', provinces: [], province: null, localities: [], selection: null,
-  provinceStatus: 'idle', localityStatus: 'idle', query: '', page: 0, total: 0, errors: {} })
-const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-export const filterProvinces = (provinces: Province[], query: string) => provinces.filter(p => normalize(p.name).includes(normalize(query.trim())))
+const initialState = (): LocationState => ({
+  mode: 'form', provinces: [], province: null, localities: [], selection: null,
+  provinceStatus: 'idle', localityStatus: 'idle', errors: {},
+})
+const PAGE_SIZE = 100
 function validPoint(point: Point) {
   return Number.isFinite(point.latitude) && Math.abs(point.latitude) <= 90 && Number.isFinite(point.longitude) && Math.abs(point.longitude) <= 180
 }
@@ -40,13 +38,14 @@ function rows(value: unknown): Record<string, unknown>[] {
   if (!value || typeof value !== 'object' || !('items' in value) || !Array.isArray(value.items)) throw new Error('Invalid catalog')
   return value.items as Record<string, unknown>[]
 }
-/** In-memory only. Every async branch is cancelled/invalidated when its context changes. */
+/** In-memory only. A failed or dismissed permission is never requested again in the same visit. */
 export class RegistrationLocation {
   state = initialState()
   private listeners = new Set<() => void>()
   private flights = new Map<string, AbortController>()
   private generation = 0
   private initialized = false
+  private asked = false
   constructor(private api: LocationTransport, private provider: PositionProvider) {}
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
   private update(patch: Partial<LocationState>) { this.state = { ...this.state, ...patch }; this.listeners.forEach(listener => listener()) }
@@ -54,36 +53,37 @@ export class RegistrationLocation {
   private current(key: string, controller: AbortController) { return !controller.signal.aborted && this.flights.get(key) === controller }
   private stopDetection() { this.generation++; this.flights.get('detect')?.abort() }
   cancel() {
-    this.generation++; this.flights.forEach(f => f.abort()); this.flights.clear(); this.initialized = false
-    this.update({ mode: this.state.mode === 'detecting' ? this.state.selection ? 'manual' : 'choice' : this.state.mode,
+    this.generation++; this.flights.forEach(flight => flight.abort()); this.flights.clear(); this.initialized = false; this.asked = false
+    this.update({
+      mode: 'form',
       provinceStatus: this.state.provinceStatus === 'loading' ? 'idle' : this.state.provinceStatus,
-      localityStatus: this.state.localityStatus === 'loading' ? 'idle' : this.state.localityStatus })
+      localityStatus: this.state.localityStatus === 'loading' ? 'idle' : this.state.localityStatus,
+    })
   }
   async initialize() {
     if (this.initialized) return
     this.initialized = true
-    if (this.state.mode === 'manual') { await this.manual(this.state.problem); return }
-    if (this.state.mode === 'resolved') return
     const generation = this.generation
-    try {
-      const permission = await this.provider.permission()
-      if (generation !== this.generation || this.state.mode !== 'choice') return
-      if (permission === 'granted') await this.detect()
-      else if (permission === 'denied' || permission === 'unavailable') await this.manual(permission)
-    } catch { if (generation === this.generation) await this.manual('unavailable') }
-  }
-  async manual(problem?: LocationProblem) {
-    this.stopDetection()
-    this.update({ mode: 'manual', problem, errors: {} })
-    if (this.state.provinceStatus === 'idle') await this.loadProvinces()
-    if (this.state.province && this.state.localityStatus === 'idle') await this.searchLocalities('')
+    const work: Promise<unknown>[] = []
+    if (this.state.provinceStatus === 'idle') work.push(this.loadProvinces())
+    if (this.state.province && this.state.localityStatus === 'idle') work.push(this.loadLocalities())
+    let permission: Permission = 'unavailable'
+    try { permission = await this.provider.permission() } catch { permission = 'unavailable' }
+    if (generation !== this.generation) return
+    if (permission === 'denied' || permission === 'unavailable' || this.state.province || this.state.selection) {
+      this.asked = true
+      this.update({ mode: 'form', ...(permission === 'denied' || permission === 'unavailable' ? { problem: permission } : {}) })
+      await Promise.all(work)
+      return
+    }
+    await Promise.all([...work, this.detect()])
   }
   async detect() {
-    if (this.state.mode === 'detecting') return
+    if (this.asked || this.state.mode === 'detecting') return
+    this.asked = true
     const generation = ++this.generation
     const controller = this.flight('detect')
-    this.update({ mode: 'detecting', problem: undefined, errors: {} })
-    // A system permission request/position can outlive this timeout; it must never overwrite manual input.
+    this.update({ mode: 'detecting' })
     let timer: ReturnType<typeof setTimeout> | undefined
     try {
       const position = await Promise.race([this.provider.position(controller.signal), new Promise<never>((_, reject) => {
@@ -93,19 +93,30 @@ export class RegistrationLocation {
       if (!validPoint(position)) throw new PositionError('unavailable')
       const result = await this.api.get<{ status: string; reason?: string; location?: Record<string, unknown> }>(
         `/locations/resolve?latitude=${position.latitude}&longitude=${position.longitude}`, { signal: controller.signal, timeoutMs: 12000 })
-      if (generation !== this.generation || controller.signal.aborted) return
+      if (generation !== this.generation || controller.signal.aborted || this.state.province || this.state.selection) {
+        if (generation === this.generation && !controller.signal.aborted) this.update({ mode: 'form' })
+        return
+      }
       const location = result.location
       if (result.status !== 'RESOLVED' || !location || location.countryCode !== 'AR' || typeof location.provinceId !== 'string' ||
           typeof location.provinceName !== 'string' || typeof location.localityId !== 'string' || typeof location.localityName !== 'string') {
         throw new PositionError(result.reason === 'OUTSIDE_COVERAGE' ? 'outside' : 'unavailable')
       }
-      const selection: ResolvedLocation = { countryCode: 'AR', provinceId: location.provinceId, provinceName: location.provinceName,
-        localityId: location.localityId, localityName: location.localityName, ...position }
-      this.flights.get('localities')?.abort()
-      this.update({ mode: 'resolved', selection, province: { id: selection.provinceId, name: selection.provinceName },
-        localityStatus: 'idle', localities: [], query: '', problem: undefined, errors: {} })
+      const province = { id: location.provinceId, name: location.provinceName }
+      const selection: ResolvedLocation = {
+        countryCode: 'AR', provinceId: province.id, provinceName: province.name,
+        localityId: location.localityId, localityName: location.localityName, ...position,
+      }
+      this.update({
+        mode: 'form', problem: undefined, errors: {}, province, selection,
+        provinces: this.state.provinces.some(item => item.id === province.id) ? this.state.provinces : [...this.state.provinces, province],
+        localities: [{ id: selection.localityId, name: selection.localityName, provinceId: province.id }],
+        localityStatus: 'ready',
+      })
+      await this.loadLocalities()
     } catch (error) {
-      if (generation === this.generation && !controller.signal.aborted) await this.manual(error instanceof PositionError ? error.reason : 'unavailable')
+      if (generation === this.generation && !controller.signal.aborted)
+        this.update({ mode: 'form', problem: error instanceof PositionError ? error.reason : 'unavailable' })
     } finally { if (timer) clearTimeout(timer) }
   }
   async loadProvinces() {
@@ -118,55 +129,76 @@ export class RegistrationLocation {
         return { id: row.id, name: row.name }
       })
       if (!provinces.length) throw new Error('Empty province catalog')
-      if (this.current('provinces', controller)) this.update({ provinces, provinceStatus: 'ready' })
+      if (!this.current('provinces', controller)) return
+      const selected = this.state.province
+      this.update({
+        provinces: selected && !provinces.some(item => item.id === selected.id) ? [...provinces, selected] : provinces,
+        provinceStatus: 'ready',
+      })
     } catch { if (this.current('provinces', controller)) this.update({ provinceStatus: 'error' }) }
   }
   async selectProvince(province: Province) {
-    if (!this.state.provinces.some(p => p.id === province.id)) return
+    if (!this.state.provinces.some(item => item.id === province.id)) return
     this.stopDetection()
-    this.update({ province, selection: null, localities: [], localityStatus: 'idle', query: '', total: 0, errors: {} })
-    await this.searchLocalities('')
+    this.update({ mode: 'form', province, selection: null, localities: [], localityStatus: 'idle', errors: {} })
+    await this.loadLocalities()
   }
-  async searchLocalities(query: string, page = 0) {
+  async loadLocalities() {
     const provinceId = this.state.province?.id
     if (!provinceId) return
     const controller = this.flight('localities')
-    this.update({ query, page, localityStatus: 'loading' })
+    this.update({ localityStatus: 'loading' })
     try {
-      const response = await this.api.get<{ items: unknown[]; total: number }>(
-        `/locations/localities?provinceId=${encodeURIComponent(provinceId)}&q=${encodeURIComponent(query)}&page=${page}&size=25`,
-        { signal: controller.signal, timeoutMs: 12000 })
-      const localities = rows(response).map(row => {
-        if (typeof row.id !== 'string' || typeof row.name !== 'string' || row.provinceId !== provinceId) throw new Error('Invalid locality')
-        return { id: row.id, name: row.name, provinceId }
-      })
-      if (!Number.isInteger(response.total) || response.total < 0) throw new Error('Invalid result count')
-      if (this.current('localities', controller) && this.state.province?.id === provinceId)
-        this.update({ localities, total: response.total, localityStatus: 'ready' })
+      const localities: Locality[] = []
+      let page = 0
+      let total = 0
+      do {
+        const response = await this.api.get<{ items: unknown[]; total: number }>(
+          `/locations/localities?provinceId=${encodeURIComponent(provinceId)}&q=&page=${page}&size=${PAGE_SIZE}`,
+          { signal: controller.signal, timeoutMs: 12000 })
+        if (!this.current('localities', controller) || this.state.province?.id !== provinceId) return
+        const batch = rows(response).map(row => {
+          if (typeof row.id !== 'string' || typeof row.name !== 'string' || row.provinceId !== provinceId) throw new Error('Invalid locality')
+          return { id: row.id, name: row.name, provinceId }
+        })
+        if (!Number.isInteger(response.total) || response.total < 0) throw new Error('Invalid result count')
+        total = response.total
+        localities.push(...batch)
+        page += 1
+        if (!batch.length || batch.length < PAGE_SIZE) break
+      } while (localities.length < total && page < 40)
+      if (!this.current('localities', controller) || this.state.province?.id !== provinceId) return
+      const selected = this.state.selection
+      if (selected?.provinceId === provinceId && !localities.some(item => item.id === selected.localityId))
+        localities.unshift({ id: selected.localityId, name: selected.localityName, provinceId })
+      this.update({ localities, localityStatus: 'ready' })
     } catch { if (this.current('localities', controller)) this.update({ localityStatus: 'error' }) }
   }
   selectLocality(locality: Locality) {
-    if (!this.state.localities.some(l => l.id === locality.id) || this.state.province?.id !== locality.provinceId) return
+    if (!this.state.localities.some(item => item.id === locality.id) || this.state.province?.id !== locality.provinceId) return
     this.stopDetection()
-    this.update({ selection: { countryCode: 'AR', provinceId: locality.provinceId, provinceName: this.state.province.name,
-      localityId: locality.id, localityName: locality.name }, problem: undefined, errors: {} })
+    this.update({
+      mode: 'form', problem: undefined, errors: {},
+      selection: {
+        countryCode: 'AR', provinceId: locality.provinceId, provinceName: this.state.province.name,
+        localityId: locality.id, localityName: locality.name,
+      },
+    })
   }
   validate() {
-    if (this.state.mode === 'detecting') return false
-    const errors = { ...(!this.state.province ? { province: 'Seleccioná una provincia.' } : {}),
-      ...(!this.state.selection ? { locality: 'Seleccioná una localidad.' } : {}) }
-    if (Object.keys(errors).length) {
-      if (this.state.mode !== 'manual') void this.manual()
-      this.update({ errors })
-      return false
+    const errors = {
+      ...(!this.state.province ? { province: 'Seleccioná una provincia.' } : {}),
+      ...(!this.state.selection ? { locality: 'Seleccioná una localidad.' } : {}),
     }
-    this.update({ errors: {} }); return true
+    this.update({ errors })
+    return Object.keys(errors).length === 0
   }
   request(): LocationRequest | undefined {
-    if (this.state.mode === 'detecting') return undefined
     const value = this.state.selection
     if (!value) return undefined
-    return { countryCode: 'AR', provinceId: value.provinceId, localityId: value.localityId,
-      ...(value.latitude !== undefined && value.longitude !== undefined ? { latitude: value.latitude, longitude: value.longitude } : {}) }
+    return {
+      countryCode: 'AR', provinceId: value.provinceId, localityId: value.localityId,
+      ...(value.latitude !== undefined && value.longitude !== undefined ? { latitude: value.latitude, longitude: value.longitude } : {}),
+    }
   }
 }
