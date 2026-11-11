@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createApiClient, ApiError } from '@/lib/http-client'
 import { API_BASE } from '@/lib/constants'
 import { parseCatalog, type Category } from '@/features/club/category-policy/category-policy'
+import type { LocationRequest } from './registration-location'
 
 // Registration never sends an existing account bearer or stores credentials.
 const api = createApiClient({ baseUrl: API_BASE, getToken: () => null })
@@ -52,16 +53,16 @@ export function usePlayerRegistration(platform: 'WEB' | 'ANDROID' | 'IOS', initi
     })
     return () => { active = false }
   }, [initialProof])
-  async function action(kind: 'start' | 'resend' | 'complete' | 'verify') {
+  async function action(kind: 'start' | 'resend' | 'complete' | 'verify', location?: LocationRequest) {
     if (lock.current) return
     if (kind === 'start') {
       const invalid = validateDraft(draft); setErrors(invalid)
-      if (Object.keys(invalid).length || catalogState !== 'ready') return
+      if (Object.keys(invalid).length || catalogState !== 'ready' || !location) return
     }
     lock.current = true; setBusy(true); setBusyAction(kind); setNotice(null); setResent(false)
     try {
       if (kind === 'start') {
-        const result = await api.post<{ sessionId: string; managementToken: string }>('/onboarding/players/start', { ...draft, email: draft.email.trim(), platform }, options)
+        const result = await api.post<{ sessionId: string; managementToken: string }>('/onboarding/players/start', { ...draft, location, email: draft.email.trim(), platform }, options)
         setProof({ sessionId: result.sessionId, email: draft.email.trim(), token: result.managementToken })
         setDraft(current => ({ ...current, password: '' })); setStage('pending')
       } else if (kind === 'resend' && proof) {

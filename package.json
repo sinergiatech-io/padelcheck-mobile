@@ -13,7 +13,8 @@
     "test:session": "node scripts/test-session.cjs",
     "test:startup": "node scripts/test-startup.cjs",
     "smoke:http": "node scripts/test-http.cjs --smoke",
-    "test:recovery": "node scripts/test-recovery.cjs"
+    "test:recovery": "node scripts/test-recovery.cjs",
+    "test:location": "node scripts/test-registration-location.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
@@ -27,6 +28,7 @@
     "expo-font": "~58.0.11",
     "expo-linear-gradient": "~58.0.3",
     "expo-linking": "~58.0.15",
+    "expo-location": "~58.0.21",
     "expo-router": "~58.0.28",
     "expo-secure-store": "~58.0.2",
     "expo-splash-screen": "~58.0.12",

@@ -9,6 +9,9 @@ import { StartupReady } from '@/features/startup/StartupReady'
 import { usePlayerRegistration, validateDraft, statusCopy, type Draft, type Proof } from './player-registration'
 import { courtXml, eyeXml, eyeOnXml } from './auth-icons'
 import { chevronXml, infoXml, successXml, errorXml, warningXml } from './register-icons'
+import { useRegistrationLocation } from './use-registration-location'
+import { nativePosition } from './native-location'
+import { RegistrationLocationFields } from './RegistrationLocationFields'
 
 const tones = { info: 'border-[#C2D8FC] bg-[#EBF3FE]', success: 'border-[#BAEDCD] bg-[#E9F9EF]', error: 'border-[#FAC5C5] bg-[#FDECEC]', warning: 'border-[#FCE1B3] bg-[#FEF5E7]' }
 function Banner({ title, detail, tone = 'error' }: { title: string; detail: string; tone?: keyof typeof tones }) {
@@ -39,6 +42,7 @@ export function PlayerRegisterScreen({ verification = false }: { verification?: 
   const [initialProof] = useState<Proof | undefined>(() => verification ? { sessionId: params.sessionId ?? '', email: params.email ?? '', token: params.token ?? '' } : undefined)
   const registration = usePlayerRegistration(Platform.OS === 'ios' ? 'IOS' : 'ANDROID', initialProof)
   const { draft, updateField, errors, categories, catalogState, retryCatalog, stage, proof, busy, busyAction, notice, resent, action } = registration
+  const geography = useRegistrationLocation(nativePosition, stage === 'form')
   const [showPassword, setShowPassword] = useState(false)
   const scroll = useRef<ElementRef<typeof ScrollView>>(null)
   const scrollOffset = useRef(0)
@@ -72,13 +76,18 @@ export function PlayerRegisterScreen({ verification = false }: { verification?: 
   }, [])
   const setField = updateField
   const submit = () => {
+    const validLocation = geography.model.validate()
     const invalid = validateDraft(draft)
     const first = Object.keys(invalid)[0] as keyof Draft | undefined
-    void action('start')
+    void action('start', geography.model.request())
     if (first) requestAnimationFrame(() => {
       inputs.current[first]?.focus()
       AccessibilityInfo.announceForAccessibility(invalid[first]!)
     })
+    else if (!validLocation) {
+      scroll.current?.scrollToEnd({ animated: true })
+      AccessibilityInfo.announceForAccessibility('Elegí tu provincia y localidad.')
+    }
   }
   const heading = (title: string, subtitle: string) => <View className="gap-[8px]"><Text ref={headingRef} accessibilityRole="header" className="font-inter-700 text-[20px] leading-[28px] text-[#120F18]">{title}</Text><Text className="font-sans text-[16px] leading-[24px] text-[#605E64]">{subtitle}</Text></View>
   const button = (label: string, onPress: () => void) => <Button accessibilityLabel={label} loading={busy || stage === 'verifying'} loadingLabel={`${label}…`} onPress={onPress} className={`h-[48px] rounded-[8px] disabled:opacity-100 ${busy ? 'bg-[#EEF0C1]' : 'bg-[#C9CF38]'}`}><Text className="font-inter-500 text-[14px] leading-[21px] text-[#120F18]">{label}</Text></Button>
@@ -118,10 +127,12 @@ export function PlayerRegisterScreen({ verification = false }: { verification?: 
         {errors[key] && <Text accessibilityRole="alert" className="text-right font-inter-500 text-[14px] leading-[20px] text-[#AA3030]">{errors[key]}</Text>}
         {key === 'baseCategoryId' && catalogState === 'error' && <View><Text className="font-sans text-sm text-[#AA3030]">No pudimos cargar las categorías.</Text><Button variant="ghost" onPress={retryCatalog}>Reintentar</Button></View>}
       </View>
-    })}</View>
+    })}
+    <RegistrationLocationFields model={geography.model} state={geography.state} disabled={busy} />
+    </View>
     <Text className="font-sans text-[16px] leading-[24px] text-[#605E64]">Vas a necesitar verificar tu email para activar tu cuenta.</Text>
     <View className="gap-[8px]">{button(notice ? 'Reintentar' : 'Crear cuenta', submit)}
-      <View className="flex-row items-center justify-center gap-[8px]"><Text className="font-inter-500 text-[14px] text-[#605E64]">¿Ya tenés cuenta?</Text><Button variant="ghost" onPress={login} className="h-[44px]">Iniciar sesión</Button></View>
+      <View className="flex-row items-center justify-center gap-[8px]"><Text className="font-inter-500 text-[14px] text-[#605E64]">¿Ya tenés cuenta?</Text><Button variant="ghost" disabled={busy} onPress={login} className="h-[44px]">Iniciar sesión</Button></View>
     </View>
   </ScrollView></Shell>
 }
