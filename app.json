@@ -30,6 +30,19 @@
       "expo-secure-store",
       "expo-status-bar",
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Usamos tu ubicación para encontrar tu localidad y mostrarte eventos cercanos. También podés elegirla manualmente.",
+          "locationAlwaysPermission": false,
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationFullAccuracyPermission": false,
+          "motionUsagePermission": false,
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",

@@ -9,6 +9,9 @@ import { StartupReady } from '@/features/startup/StartupReady'
 import { usePlayerRegistration, validateDraft, statusCopy, type Draft, type Proof } from './player-registration'
 import { courtXml, eyeXml, eyeOnXml } from './auth-icons'
 import { chevronXml, infoXml, successXml, errorXml, warningXml } from './register-icons'
+import { useRegistrationLocation } from './use-registration-location'
+import { nativePosition } from './native-location'
+import { RegistrationLocationFields } from './RegistrationLocationFields'
 
 const tones = { info: 'border-[#C2D8FC] bg-[#EBF3FE]', success: 'border-[#BAEDCD] bg-[#E9F9EF]', error: 'border-[#FAC5C5] bg-[#FDECEC]', warning: 'border-[#FCE1B3] bg-[#FEF5E7]' }
 function Banner({ title, detail, tone = 'error' }: { title: string; detail: string; tone?: keyof typeof tones }) {
@@ -39,15 +42,17 @@ export function PlayerRegisterScreen({ verification = false }: { verification?: 
   const [initialProof] = useState<Proof | undefined>(() => verification ? { sessionId: params.sessionId ?? '', email: params.email ?? '', token: params.token ?? '' } : undefined)
   const registration = usePlayerRegistration(Platform.OS === 'ios' ? 'IOS' : 'ANDROID', initialProof)
   const { draft, updateField, errors, categories, catalogState, retryCatalog, stage, proof, busy, busyAction, notice, resent, action } = registration
+  const geography = useRegistrationLocation(nativePosition, stage === 'form')
   const [showPassword, setShowPassword] = useState(false)
   const scroll = useRef<ElementRef<typeof ScrollView>>(null)
   const scrollOffset = useRef(0)
   const focusedKey = useRef<keyof Draft | null>(null)
+  const locationSearch = useRef<ElementRef<typeof TextInput> | null>(null)
   const keyboardTop = useRef<number | null>(null)
   const headingRef = useRef<ElementRef<typeof Text>>(null)
   const inputs = useRef<Partial<Record<keyof Draft, ElementRef<typeof TextInput>>>>({})
   const revealFocused = () => {
-    const input = focusedKey.current ? inputs.current[focusedKey.current] : undefined
+    const input = locationSearch.current ?? (focusedKey.current ? inputs.current[focusedKey.current] : undefined)
     const scroller = scroll.current
     const limit = keyboardTop.current
     if (!input || !scroller || limit == null) return
@@ -72,16 +77,18 @@ export function PlayerRegisterScreen({ verification = false }: { verification?: 
   }, [])
   const setField = updateField
   const submit = () => {
+    const validLocation = geography.model.validate()
     const invalid = validateDraft(draft)
     const first = Object.keys(invalid)[0] as keyof Draft | undefined
-    void action('start')
+    void action('start', geography.model.request())
+    if (!validLocation) { scroll.current?.scrollTo({ y: 0, animated: true }); AccessibilityInfo.announceForAccessibility('Elegí tu provincia y localidad.'); return }
     if (first) requestAnimationFrame(() => {
       inputs.current[first]?.focus()
       AccessibilityInfo.announceForAccessibility(invalid[first]!)
     })
   }
   const heading = (title: string, subtitle: string) => <View className="gap-[8px]"><Text ref={headingRef} accessibilityRole="header" className="font-inter-700 text-[20px] leading-[28px] text-[#120F18]">{title}</Text><Text className="font-sans text-[16px] leading-[24px] text-[#605E64]">{subtitle}</Text></View>
-  const button = (label: string, onPress: () => void) => <Button accessibilityLabel={label} loading={busy || stage === 'verifying'} loadingLabel={`${label}…`} onPress={onPress} className={`h-[48px] rounded-[8px] disabled:opacity-100 ${busy ? 'bg-[#EEF0C1]' : 'bg-[#C9CF38]'}`}><Text className="font-inter-500 text-[14px] leading-[21px] text-[#120F18]">{label}</Text></Button>
+  const button = (label: string, onPress: () => void) => <Button accessibilityLabel={label} disabled={stage === 'form' && geography.state.mode === 'detecting'} loading={busy || stage === 'verifying'} loadingLabel={`${label}…`} onPress={onPress} className={`h-[48px] rounded-[8px] disabled:opacity-100 ${busy ? 'bg-[#EEF0C1]' : 'bg-[#C9CF38]'}`}><Text className="font-inter-500 text-[14px] leading-[21px] text-[#120F18]">{label}</Text></Button>
   if (stage !== 'form') {
     const [title, subtitle, banner, detail, label, tone] = statusCopy[busyAction === 'complete' ? 'activating' : stage]
     return <Shell><ScrollView contentContainerStyle={{ flexGrow: 1, padding: 16, paddingTop: 24, gap: 16 }}>
@@ -99,6 +106,7 @@ export function PlayerRegisterScreen({ verification = false }: { verification?: 
   return <Shell><ScrollView ref={scroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={false} onScroll={(event) => { scrollOffset.current = event.nativeEvent.contentOffset.y }} scrollEventThrottle={16} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 24, paddingBottom: 32, gap: 16 }}>
     {heading('Creá tu cuenta de jugador', 'Completá tus datos y elegí tu categoría para empezar.')}
     {notice && <Banner title={notice} detail="Intentá de nuevo." />}
+    <RegistrationLocationFields model={geography.model} state={geography.state} disabled={busy} onSearchFocus={input => { locationSearch.current = input; focusedKey.current = null; setTimeout(revealFocused, 80) }} onSearchBlur={() => { locationSearch.current = null }} />
     <View className="gap-[12px]">{(['firstName', 'lastName', 'email', 'password', 'gender', 'baseCategoryId'] as const).map(key => {
       const label = { firstName: 'Nombre', lastName: 'Apellido', email: 'Email', password: 'Contraseña', gender: 'Sexo', baseCategoryId: 'Categoría' }[key]
       return <View key={key} className="gap-[8px]"><Text className="font-inter-500 text-[14px] leading-[20px] text-[#120F18]">{label}<Text className="text-[#EF4444]">*</Text></Text>
@@ -111,7 +119,7 @@ export function PlayerRegisterScreen({ verification = false }: { verification?: 
           autoComplete={{ firstName: 'given-name', lastName: 'family-name', email: 'email', password: 'new-password' }[key] as 'given-name' | 'family-name' | 'email' | 'new-password'}
           keyboardType={key === 'email' ? 'email-address' : 'default'} maxLength={key === 'firstName' || key === 'lastName' ? 100 : key === 'email' ? 255 : undefined}
           placeholder={{ firstName: 'Tu nombre', lastName: 'Tu apellido', email: 'nombre@correo.com', password: 'Creá una contraseña' }[key]} placeholderTextColor="#605E64"
-          onFocus={() => { focusedKey.current = key; setTimeout(revealFocused, 80) }}
+          onFocus={() => { locationSearch.current = null; focusedKey.current = key; setTimeout(revealFocused, 80) }}
           className={`${fieldClass} ${errors[key] ? 'border-[#EF4444]' : ''} ${key === 'password' ? 'pr-[56px]' : ''}`} />
           {key === 'password' && <Pressable disabled={busy} accessibilityRole="button" accessibilityLabel={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'} onPress={() => setShowPassword(value => !value)} className="absolute right-[8px] top-[4px] h-[48px] w-[40px] items-center justify-center"><SvgXml xml={showPassword ? eyeOnXml : eyeXml} width={24} height={24} /></Pressable>}
         </View>}
@@ -121,7 +129,7 @@ export function PlayerRegisterScreen({ verification = false }: { verification?: 
     })}</View>
     <Text className="font-sans text-[16px] leading-[24px] text-[#605E64]">Vas a necesitar verificar tu email para activar tu cuenta.</Text>
     <View className="gap-[8px]">{button(notice ? 'Reintentar' : 'Crear cuenta', submit)}
-      <View className="flex-row items-center justify-center gap-[8px]"><Text className="font-inter-500 text-[14px] text-[#605E64]">¿Ya tenés cuenta?</Text><Button variant="ghost" onPress={login} className="h-[44px]">Iniciar sesión</Button></View>
+      <View className="flex-row items-center justify-center gap-[8px]"><Text className="font-inter-500 text-[14px] text-[#605E64]">¿Ya tenés cuenta?</Text><Button variant="ghost" disabled={busy} onPress={login} className="h-[44px]">Iniciar sesión</Button></View>
     </View>
   </ScrollView></Shell>
 }
