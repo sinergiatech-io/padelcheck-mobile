@@ -1,9 +1,11 @@
 import { useCallback, useRef, useState } from 'react'
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { Redirect, router, useFocusEffect, usePreventRemove, type Href } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
+import { SvgXml } from 'react-native-svg'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import { useAuth } from '@/context/AuthContext'
 import { SessionUnverified } from '@/features/auth/SessionUnverified'
 import { StartupReady } from '@/features/startup/StartupReady'
@@ -13,6 +15,7 @@ import { useSportSettings } from './use-sport-settings'
 
 const HOME = '/club/settings'
 const field = { borderWidth: 1, borderColor: '#929195', borderRadius: 8, paddingHorizontal: 16, minHeight: 56, backgroundColor: '#fefefe', color: '#120f18' } as const
+const TRASH_XML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 21C6.45 21 5.979 20.804 5.587 20.412C5.195 20.02 4.999 19.549 5 19V7H4V5H9V4H15V5H20V7H19V19C19 19.55 18.804 20.021 18.412 20.413C18.02 20.805 17.549 21.001 17 21H7ZM9 17H11V9H9V17ZM13 17H15V9H13V17Z" fill="#D93E3E"/></svg>'
 
 function useClubAccess() {
   const { user, destination, phase } = useAuth()
@@ -62,11 +65,11 @@ export function ClubSportSettingsScreen() {
           <View style={{ flex: 1, backgroundColor: '#f7f7f7' }}>
             <View style={s.header}>
               <Pressable accessibilityLabel="Volver" onPress={() => setDayDiscard(true)} style={s.iconBtn}><Text style={{ color: '#fff', fontSize: 22 }}>←</Text></Pressable>
-              <Text style={s.title}>Horario del {label.toLowerCase()}</Text>
+              <Text className="font-inter-700" style={s.title}>Horario del {label.toLowerCase()}</Text>
             </View>
             <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
               <View style={s.switchRow}>
-                <Text style={{ fontWeight: '500' }}>Abierto</Text>
+                <Text className="font-inter-500">Abierto</Text>
                 <Switch value={open} onValueChange={checked => settings.setDayDraft({
                   day: day.day,
                   value: checked
@@ -77,7 +80,7 @@ export function ClubSportSettingsScreen() {
               {open && (
                 <View style={{ gap: 12 }}>
                   <View style={s.switchRow}>
-                    <Text style={{ fontSize: 16, fontWeight: '600' }}>Franjas horarias</Text>
+                    <Text className="font-inter-600" style={{ fontSize: 16 }}>Franjas horarias</Text>
                     <Pressable
                       accessibilityLabel="Agregar franja"
                       onPress={() => settings.setDayDraft({
@@ -115,7 +118,7 @@ export function ClubSportSettingsScreen() {
                           })}
                           style={s.trashBtn}
                         >
-                          <Text style={{ color: '#d93e3e', fontSize: 16 }}>⌫</Text>
+                          <SvgXml xml={TRASH_XML} width={20} height={20} />
                         </Pressable>
                       </View>
                     </View>
@@ -157,7 +160,7 @@ export function ClubSportSettingsScreen() {
                 setWeekDiscard(true)
               } else router.replace(HOME as Href)
             }} style={s.iconBtn}><Text style={{ color: '#fff', fontSize: 22 }}>←</Text></Pressable>
-            <Text style={s.title}>Configuración de torneos</Text>
+            <Text className="font-inter-700" style={s.title}>Configuración de torneos</Text>
           </View>
           <ScrollView contentContainerStyle={{ padding: 16, gap: 20 }}>
             {!access.allowed ? <Text>No tenés permiso para gestionar la configuración de este club.</Text>
@@ -166,8 +169,8 @@ export function ClubSportSettingsScreen() {
                   : <>
                     {settings.result && <Text style={{ color: settings.result === 'error' ? '#aa3030' : '#078332' }}>{settings.result === 'success' ? 'Cambios guardados' : 'No pudimos guardar'}</Text>}
                     <View style={{ gap: 8 }}>
-                      <Text style={s.section}>Parámetros del partido</Text>
-                      <Text style={s.help}>Valores iniciales para nuevos torneos</Text>
+                      <Text className="font-inter-600" style={s.section}>Parámetros del partido</Text>
+                      <Text className="font-sans" style={s.help}>Valores iniciales para nuevos torneos</Text>
                       <View style={{ flexDirection: 'row', gap: 12 }}>
                         <View style={{ flex: 1, gap: 4 }}>
                           <Text style={{ fontWeight: '500' }}>Duración (min)</Text>
@@ -187,8 +190,8 @@ export function ClubSportSettingsScreen() {
                       <Text style={s.help}>Los torneos existentes conservan su configuración</Text>
                     </View>
                     <View style={{ gap: 4 }}>
-                      <Text style={s.section}>Horario semanal del club</Text>
-                      <Text style={[s.help, { marginBottom: 4 }]}>{weekSummary(settings.draft.weeklySchedule, settings.draft.partialWeek)}</Text>
+                      <Text className="font-inter-600" style={s.section}>Horario semanal del club</Text>
+                      <Text className="font-sans" style={[s.help, { marginBottom: 4 }]}>{weekSummary(settings.draft.weeklySchedule, settings.draft.partialWeek)}</Text>
                       {WEEKDAYS.map(([key, label], index) => (
                         <Pressable
                           key={key}

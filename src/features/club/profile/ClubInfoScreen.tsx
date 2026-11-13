@@ -3,6 +3,7 @@ import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Tex
 import { Redirect, router, usePreventRemove, type Href } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
+import { SvgXml } from 'react-native-svg'
 import * as ImagePicker from 'expo-image-picker'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/context/AuthContext'
@@ -15,6 +16,7 @@ import { useClubProfile } from './use-club-profile'
 
 const HOME = '/club/settings'
 const field = { borderWidth: 1, borderColor: '#929195', borderRadius: 8, paddingHorizontal: 16, minHeight: 56, backgroundColor: '#fefefe', color: '#120f18' } as const
+const EDIT_XML = '<svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg"><path fill="#605E64" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>'
 
 function useClubAccess() {
   const { user, destination, phase } = useAuth()
@@ -164,27 +166,39 @@ export function ClubInfoScreen() {
                 : profile.loadError ? <View style={{ gap: 12 }}><Text>No pudimos cargar la información.</Text><Button onPress={() => void profile.reload()}>Reintentar</Button></View>
                   : draft && <>
                     {profile.result && <Text style={{ color: profile.result === 'error' ? '#aa3030' : '#078332' }}>{profile.result === 'success' ? 'Cambios guardados' : 'No pudimos guardar los cambios'}</Text>}
-                    <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 12, gap: 12 }}>
-                      <View style={{ height: draft.coverPhotoUrl && !draft.clearCover ? 120 : 72, backgroundColor: '#e7e7e8', borderRadius: 8, overflow: 'hidden', justifyContent: 'center' }}>
+                    <View style={{ backgroundColor: '#fff', borderRadius: 12, overflow: 'hidden' }}>
+                      <View style={{
+                        width: '100%',
+                        ...(draft.coverPhotoUrl && !draft.clearCover
+                          ? { aspectRatio: 370 / 184 }
+                          : { height: 96 }),
+                        backgroundColor: '#e7e7e8',
+                        justifyContent: 'center',
+                        overflow: 'hidden',
+                      }}>
                         {draft.coverPhotoUrl && !draft.clearCover
                           ? <FramedImage uri={draft.coverPhotoUrl} framingValue={draft.coverFraming} mode="cover" style={{ width: '100%', height: '100%' }} />
                           : <Pressable disabled={busy} onPress={() => void pick('cover')} style={{ alignSelf: 'center', backgroundColor: '#f7f7f7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }}>
-                            <Text>Agregar portada</Text>
+                            <Text className="font-inter-500">Agregar portada</Text>
                           </Pressable>}
-                        <Pressable style={s.editFab} onPress={() => setMenu('cover')} disabled={busy} accessibilityLabel="Editar portada"><Text style={{ color: '#fff', fontSize: 18 }}>✎</Text></Pressable>
+                        <Pressable style={s.editFab} onPress={() => setMenu('cover')} disabled={busy} accessibilityLabel="Editar portada">
+                          <View style={s.editFabDisk}><SvgXml xml={EDIT_XML} width={18} height={18} /></View>
+                        </Pressable>
                       </View>
-                      <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                      <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', padding: 16 }}>
                         <View style={{ width: 64, height: 64 }}>
                           <View style={{ width: 64, height: 64, borderRadius: 12, backgroundColor: '#100e16', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
                             {draft.logoUrl && !draft.clearLogo
                               ? <FramedImage uri={draft.logoUrl} framingValue={draft.logoFraming} mode="contain" style={{ width: '100%', height: '100%' }} />
                               : <Pressable disabled={busy} onPress={() => void pick('logo')} accessibilityLabel="Agregar logo"><Text style={{ color: '#fafaeb', fontSize: 24 }}>+</Text></Pressable>}
                           </View>
-                          <Pressable style={[s.editFab, { right: -4, bottom: -4 }]} onPress={() => setMenu('logo')} disabled={busy} accessibilityLabel="Editar logo"><Text style={{ color: '#fff', fontSize: 18 }}>✎</Text></Pressable>
+                          <Pressable style={[s.editFab, { right: -4, bottom: -4 }]} onPress={() => setMenu('logo')} disabled={busy} accessibilityLabel="Editar logo">
+                            <View style={s.editFabDisk}><SvgXml xml={EDIT_XML} width={18} height={18} /></View>
+                          </Pressable>
                         </View>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 18, fontWeight: '600' }} numberOfLines={1}>{draft.name || 'Club'}</Text>
-                          <Pressable onPress={() => router.push('/club/settings/info/preview' as Href)}><Text style={{ color: '#413f46' }}>Ver perfil público</Text></Pressable>
+                          <Text className="font-inter-600" style={{ fontSize: 18 }} numberOfLines={1}>{draft.name || 'Club'}</Text>
+                          <Pressable onPress={() => router.push('/club/settings/info/preview' as Href)}><Text className="font-inter-500" style={{ color: '#413f46' }}>Ver perfil público</Text></Pressable>
                         </View>
                       </View>
                     </View>
@@ -344,7 +358,8 @@ const s = StyleSheet.create({
   title: { color: '#fff', fontSize: 20, fontWeight: '700', flex: 1 },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  editFab: { position: 'absolute', right: 12, bottom: 12, width: 44, height: 44, borderRadius: 22, backgroundColor: '#100e16', alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  editFab: { position: 'absolute', right: 8, bottom: 8, width: 44, height: 44, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  editFabDisk: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 2, elevation: 2 },
   section: { fontSize: 16, fontWeight: '600', marginTop: 8 },
   help: { fontSize: 12, color: '#605e64' },
   modalBg: { flex: 1, backgroundColor: '#0006', justifyContent: 'flex-end' },
