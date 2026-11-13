@@ -164,24 +164,28 @@ export function ClubInfoScreen() {
                 : profile.loadError ? <View style={{ gap: 12 }}><Text>No pudimos cargar la información.</Text><Button onPress={() => void profile.reload()}>Reintentar</Button></View>
                   : draft && <>
                     {profile.result && <Text style={{ color: profile.result === 'error' ? '#aa3030' : '#078332' }}>{profile.result === 'success' ? 'Cambios guardados' : 'No pudimos guardar los cambios'}</Text>}
-                    <View style={{ aspectRatio: 370 / 184, backgroundColor: '#e7e7e8', borderRadius: 12 }}>
-                      {draft.coverPhotoUrl && !draft.clearCover
-                        ? <FramedImage uri={draft.coverPhotoUrl} framingValue={draft.coverFraming} mode="cover" style={{ width: '100%', height: '100%', borderRadius: 12 }} />
-                        : <View style={s.center}><Text>Sin portada</Text></View>}
-                      <Pressable style={s.editFab} onPress={() => setMenu('cover')} disabled={busy} accessibilityLabel="Editar portada"><Text style={{ color: '#fff' }}>✎</Text></Pressable>
-                    </View>
-                    <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-end', marginTop: -40 }}>
-                      <View style={{ width: 80, height: 80 }}>
-                        <View style={{ width: 80, height: 80, borderRadius: 12, backgroundColor: '#100e16', borderWidth: 4, borderColor: '#f7f7f7', overflow: 'hidden' }}>
-                          {draft.logoUrl && !draft.clearLogo
-                            ? <FramedImage uri={draft.logoUrl} framingValue={draft.logoFraming} mode="contain" style={{ width: '100%', height: '100%' }} />
-                            : null}
-                        </View>
-                        <Pressable style={[s.editFab, { right: -4, bottom: -4 }]} onPress={() => setMenu('logo')} disabled={busy} accessibilityLabel="Editar logo"><Text style={{ color: '#fff' }}>✎</Text></Pressable>
+                    <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 12, gap: 12 }}>
+                      <View style={{ height: draft.coverPhotoUrl && !draft.clearCover ? 120 : 72, backgroundColor: '#e7e7e8', borderRadius: 8, overflow: 'hidden', justifyContent: 'center' }}>
+                        {draft.coverPhotoUrl && !draft.clearCover
+                          ? <FramedImage uri={draft.coverPhotoUrl} framingValue={draft.coverFraming} mode="cover" style={{ width: '100%', height: '100%' }} />
+                          : <Pressable disabled={busy} onPress={() => void pick('cover')} style={{ alignSelf: 'center', backgroundColor: '#f7f7f7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }}>
+                            <Text>Agregar portada</Text>
+                          </Pressable>}
+                        <Pressable style={s.editFab} onPress={() => setMenu('cover')} disabled={busy} accessibilityLabel="Editar portada"><Text style={{ color: '#fff', fontSize: 18 }}>✎</Text></Pressable>
                       </View>
-                      <View style={{ paddingBottom: 4 }}>
-                        <Text style={{ fontSize: 18, fontWeight: '600' }}>{draft.name || 'Club'}</Text>
-                        <Pressable onPress={() => router.push('/club/settings/info/preview' as Href)}><Text style={{ color: '#5b6b00', textDecorationLine: 'underline' }}>Ver perfil público</Text></Pressable>
+                      <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                        <View style={{ width: 64, height: 64 }}>
+                          <View style={{ width: 64, height: 64, borderRadius: 12, backgroundColor: '#100e16', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
+                            {draft.logoUrl && !draft.clearLogo
+                              ? <FramedImage uri={draft.logoUrl} framingValue={draft.logoFraming} mode="contain" style={{ width: '100%', height: '100%' }} />
+                              : <Pressable disabled={busy} onPress={() => void pick('logo')} accessibilityLabel="Agregar logo"><Text style={{ color: '#fafaeb', fontSize: 24 }}>+</Text></Pressable>}
+                          </View>
+                          <Pressable style={[s.editFab, { right: -4, bottom: -4 }]} onPress={() => setMenu('logo')} disabled={busy} accessibilityLabel="Editar logo"><Text style={{ color: '#fff', fontSize: 18 }}>✎</Text></Pressable>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 18, fontWeight: '600' }} numberOfLines={1}>{draft.name || 'Club'}</Text>
+                          <Pressable onPress={() => router.push('/club/settings/info/preview' as Href)}><Text style={{ color: '#413f46' }}>Ver perfil público</Text></Pressable>
+                        </View>
                       </View>
                     </View>
                     {(profile.fieldErrors.logo || profile.fieldErrors.cover) && <Text style={{ color: '#aa3030' }}>{profile.fieldErrors.logo || profile.fieldErrors.cover}</Text>}

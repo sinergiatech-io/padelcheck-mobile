@@ -229,6 +229,14 @@ export function daySummary(day: DaySchedule) {
   return day.intervals.map(i => `${i.open}–${i.close}`).join(', ') || 'Abierto'
 }
 
+export function weekSummary(schedule: WeeklySchedule, partialWeek: boolean) {
+  const days = Object.values(schedule)
+  const open = days.filter(d => d.status === 'OPEN').length
+  const closed = days.filter(d => d.status === 'CLOSED').length
+  const prefix = partialWeek ? 'Semana parcial' : 'Semana completa'
+  return `${prefix} · ${open} abiertos, ${closed} cerrados`
+}
+
 export function mediaKeyFromUrl(url: string | null | undefined) {
   if (!url) return null
   if (url.startsWith('/api/media/')) return url.slice('/api/media/'.length)
