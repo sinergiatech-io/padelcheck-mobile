@@ -1,6 +1,8 @@
 import { StartupReady } from '@/features/startup/StartupReady'
 import { Redirect, Tabs, usePathname } from 'expo-router'
 import { ActivityIndicator, Text, View } from 'react-native'
+import { SvgXml } from 'react-native-svg'
+import { venueIcons } from '@/features/club/venues/venue-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   BOTTOM_NAV_ACTIVE_COLOR,
@@ -97,8 +99,17 @@ function AppTabs({ mode }: { mode: 'player' | 'club' }) {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Club',
+          title: 'Dashboard',
+          href: mode === 'club' ? undefined : null,
+          tabBarIcon: ({ focused }) => <SvgXml xml={focused ? venueIcons.navDashboardActive.xml : venueIcons.navDashboard.xml} width={venueIcons.navDashboard.width} height={venueIcons.navDashboard.height} />,
+        }}
+      />
+      <Tabs.Screen
+        name="club"
+        options={{
+          title: 'Mi Club',
           href: mode === 'player' ? null : undefined,
+          tabBarIcon: ({ focused }) => <SvgXml xml={focused ? venueIcons.navClub.xml : venueIcons.navClubInactive.xml} width={venueIcons.navClub.width} height={venueIcons.navClub.height} />,
         }}
       />
     </Tabs>

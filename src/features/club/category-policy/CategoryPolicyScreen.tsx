@@ -60,7 +60,7 @@ export function CategoryPolicyScreen() {
   if (phase === 'unverified') return <SessionUnverified />
   if (phase !== 'ready') return <Redirect href="/login" />
   if (destination?.kind !== 'club') return <Redirect href="/events" />
-  const back = () => router.replace('/dashboard')
+  const back = () => router.replace('/club/settings')
   return (
     <StartupReady><SafeAreaView edges={['top']} className="flex-1 bg-[#100e16]">
       <StatusBar style="light" />
@@ -98,7 +98,7 @@ export function CategoryPolicyScreen() {
           {policy.loadError ? <Button accessibilityLabel="Reintentar" style={{ height: 48, borderRadius: 8 }} onPress={() => void policy.reload()}><Text style={styles.label} className="font-inter-500">Reintentar</Text></Button> :
           <Button accessibilityLabel="Guardar cambios" style={{ height: 48, borderRadius: 8 }} className={`disabled:opacity-100 ${!policy.dirty && !policy.saving ? 'bg-[#eef0c1]' : ''}`} loading={policy.saving} loadingLabel="Guardando…" disabled={!policy.dirty} onPress={() => void policy.save()}><Text style={[styles.label, { color: !policy.dirty ? '#605e64' : '#120f18' }]} className="font-inter-500">Guardar cambios</Text></Button>}
         </View>}
-        <ClubBottomNav onDashboard={back} onClub={back} busy={policy.saving} bottomInset={insets.bottom} />
+        <ClubBottomNav onDashboard={() => router.replace('/dashboard')} onClub={back} busy={policy.saving} bottomInset={insets.bottom} />
       </View>
       <Modal transparent statusBarTranslucent navigationBarTranslucent visible={options} animationType="none" onRequestClose={() => setOptions(false)}>
         <Pressable accessibilityLabel="Cerrar opciones" onPress={() => setOptions(false)} className="flex-1" style={{ paddingTop: menuTop, paddingHorizontal: 16 }}>

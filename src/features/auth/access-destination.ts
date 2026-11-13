@@ -148,5 +148,7 @@ export function guardRedirect(
     return isPlayerArea(platform, path) ? null : destinationPath(platform, destination)
   }
   const clubRoot = platform === 'web' ? WEB_CLUB_ROOT : NATIVE_CLUB_ROOT
-  return path === clubRoot || path === '/club/settings/categories' ? null : clubRoot
+  const clubSettings = path === '/club/settings' || path === '/club/settings/categories'
+    || path === '/club/settings/venues' || path.startsWith('/club/settings/venues/')
+  return path === clubRoot || clubSettings || platform === 'native' && path === '/club' ? null : clubRoot
 }

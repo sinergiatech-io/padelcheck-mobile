@@ -1,12 +1,8 @@
-import { Image, Pressable, Text, View } from 'react-native'
-import { SvgUri } from 'react-native-svg'
+import { Pressable, Text, View } from 'react-native'
+import { SvgXml } from 'react-native-svg'
+import { venueIcons } from '../venues/venue-icons'
 
-const icons = {
-  dashboard: Image.resolveAssetSource(require('@/assets/category-policy/nav-dashboard.svg'))?.uri ?? '',
-  events: Image.resolveAssetSource(require('@/assets/category-policy/nav-events.svg'))?.uri ?? '',
-  players: Image.resolveAssetSource(require('@/assets/category-policy/nav-players.svg'))?.uri ?? '',
-  club: Image.resolveAssetSource(require('@/assets/category-policy/nav-club.svg'))?.uri ?? '',
-}
+const icons = { dashboard: venueIcons.navDashboard, events: venueIcons.navEvents, players: venueIcons.navPlayers, club: venueIcons.navClub }
 
 interface ClubBottomNavProps {
   onDashboard: () => void
@@ -32,8 +28,8 @@ export function ClubBottomNav({ onDashboard, onClub, onEvents, onPlayers, bottom
           accessibilityState={{ selected: item.label === 'Mi Club', disabled: Boolean(busy || !item.onPress) }}
           disabled={busy || !item.onPress} onPress={item.onPress}
           style={{ height: 56, paddingHorizontal: 12, paddingVertical: 8, gap: 4, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
-          <SvgUri uri={item.icon} width={19.9832} height={19.9832} />
-          <Text className="font-inter-400" style={{ fontSize: 12, lineHeight: 16, color: item.label === 'Mi Club' ? '#C9CF38' : '#FAFAEB' }}>{item.label}</Text>
+          <SvgXml xml={item.icon.xml} width={item.icon.width} height={item.icon.height} />
+          <Text className="font-sans" style={{ fontSize: 12, lineHeight: 16, color: item.label === 'Mi Club' ? '#C9CF38' : '#FAFAEB' }}>{item.label}</Text>
         </Pressable>)}
       </View>
     </View>
