@@ -1,10 +1,11 @@
 # KAN-111 — native verification
 
 Implementation and Android evidence captured on 12 November 2026; publication
-review completed on 13 November. This delivery remains pending the two Android
-groups delegated by the user: **last usable venue** and **empty club / first venue**.
-Neither is accepted by the screenshots or unit tests below. iOS runtime is
-expressly excluded by the user's resource decision; code compatibility remains.
+review completed on 13 November. The two groups delegated that day, **last usable
+venue** and **empty club / first venue**, were executed on the release APK and
+passed. The 12 November screenshots and the unit tests do not by themselves
+prove those groups; the 13 November section below is the native evidence. iOS
+runtime remains expressly excluded; code compatibility remains.
 
 ## Build and environment
 
@@ -99,6 +100,84 @@ Release SVG URI loading failed in initial QA and was corrected by bundling the
 unchanged exported SVG XML (`build:venue-icons`). `build:venue-map` regenerates
 the pinned SDK bundle. Generated assets were checked against their generators.
 
-Remaining acceptance: the two delegated Android groups, their evidence and any
-in-scope corrections. Then the orchestrator consolidates Jira and requests merge
-authorization for backend, web and mobile. Creating the PR is not ticket closure.
+## Delegated Android groups — 13 November 2026
+
+Both groups **pass** on device. No product defect was found, so this follow-up
+does not change application code. iOS runtime stays **not accredited**. Jira,
+merge and deploy stay with the orchestrator.
+
+Runtime APK rebuilt from commit `3af5eb4` at 11:35 ART
+(SHA-256 prefix `44D171A64241B810`) because the committed
+venue bundles were newer than the 12 November APK. Installed package
+`io.sinergiatech.padelcheck.mobile` matches that rebuilt APK. Bundle contains
+`http://127.0.0.1:18086/api`. Generated cleartext remains local QA only.
+Device: `emulator-5554`, AVD `PadelCheck_API_36`, 1206×2622 px, density 480
+(402×874 logical). API from the KAN-111 service checkout on loopback 18086,
+schema `kan111_qa` in the isolated `kan111_test` database. Two synthetic club
+admins, each with one `CLUB` context, `UNKNOWN` setup and
+`MANAGE_CLUB_SETTINGS`. No club selector and no onboarding wizard. ADB reverse
+used the forwarding proxy on 18087 for delayed real reads and for the induced
+cut; successful responses were not mocked. Reverse was removed afterwards.
+
+### Group A — last usable venue — pass
+
+Fixture: active `Sede Central` with one active court and one individually
+inactive court, plus active `Sede Anexo` with no courts.
+
+- Deactivating Anexo shows only the ordinary confirmation. It does not say that
+  the last usable infrastructure would be lost. Cancel leaves Anexo `ACTIVE`.
+  `android-empty-active-venue-ordinary-confirm.png`.
+- Deactivating Central, while Anexo stays active and empty, warns **Es la última
+  sede activa con canchas disponibles** and asks for confirmation.
+  `android-last-usable-venue-confirm.png`.
+- Cancel leaves Central `ACTIVE` and both court rows unchanged in PostgreSQL.
+  The venue switch stays on.
+- Confirm sets Central `INACTIVE`, records deactivation, keeps `Cancha 1`
+  `ACTIVE` and `Cancha Reserva` `INACTIVE`, disables both court switches, and
+  hides Agregar cancha. Tapping the disabled active-court switch does not change
+  it. `android-last-venue-inactive-detail.png`.
+- Reactivating Central clears deactivation, enables both court switches, leaves
+  Reserva inactive, and shows Agregar cancha again.
+- Pull-to-refresh on the short detail and the short list uses a real venue read.
+  The native indicator appears and ends; a second gesture does not duplicate
+  rows or keep spinning. Venue and court `updated_at` values do not change.
+  `android-last-venue-refresh-indicator.png`,
+  `android-last-venue-refresh-settled.png`,
+  `android-short-list-refresh-indicator.png`.
+
+`android-deactivate-confirm.png`, the PostgreSQL tests and the web last-venue
+capture remain separate and do not replace this group.
+
+### Group B — empty club and first venue — pass
+
+The second account logged in through the real logout/login flow. Its club has
+legacy display text and no canonical locality. It has no venues.
+
+- The list is explicitly empty, offers Nueva sede, and shows none of the
+  previous club's cards. `android-empty-club-list.png`.
+- Repeated pull-to-refresh keeps that empty result, shows a finite indicator
+  and does not reset the session. `android-empty-list-refresh-indicator.png`.
+- Stopping the forwarding proxy makes the next refresh fail. The screen shows
+  **No pudimos cargar las sedes** and Reintentar, keeps the empty copy, and
+  does not invent venues. Nueva sede stays disabled while the error is visible.
+  `android-empty-list-refresh-error.png`. Restarting the proxy and tapping
+  Reintentar returns the valid empty list.
+- Nueva sede shows fixed Argentina. Province and locality start empty; the
+  legacy city is not substituted. País and locality stay disabled until a
+  province is chosen, and Guardar sede stays disabled without a catalog
+  locality. `android-empty-club-new-venue.png`.
+- Searching `cordoba` finds Córdoba and searching `capi` lists localities, but
+  closing either search selects nothing. `android-empty-club-province-search.png`.
+- Choosing Córdoba and then Buenos Aires clears the locality and disables save.
+  Tandil is then selected from the catalog. The optional point is not confirmed.
+  `android-new-venue-ready-without-point.png`. With the keyboard open, the
+  focused address and both actions remain visible.
+  `android-new-venue-keyboard.png`.
+- Save from the APK creates exactly one venue, `LOCALITY_ONLY`, locality
+  `06791050`, null latitude and longitude, and no courts. The detail shows the
+  success notice, the empty-court message and Agregar cancha.
+  `android-first-venue-saved.png`. Back on the list, refresh shows **1 sedes ·
+  1 activas** and **0 canchas**. `android-first-venue-list-refresh.png`.
+
+No in-scope correction was required. Orchestrator acceptance, Jira and merge
+authorization remain outside this evidence update.
