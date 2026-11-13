@@ -3,9 +3,11 @@
 Implementation and Android evidence captured on 12 November 2026; publication
 review completed on 13 November. The two groups delegated that day, **last usable
 venue** and **empty club / first venue**, were executed on the release APK and
-passed. The 12 November screenshots and the unit tests do not by themselves
-prove those groups; the 13 November section below is the native evidence. iOS
-runtime remains expressly excluded; code compatibility remains.
+passed. A later same-day decision covers **initial list loading**: spinner-only
+footer (no visible loading copy / plus), with native evidence below. The
+12 November screenshots and the unit tests do not by themselves prove those
+groups or the spinner decision. iOS runtime remains expressly excluded; code
+compatibility remains.
 
 ## Build and environment
 
@@ -102,22 +104,21 @@ the pinned SDK bundle. Generated assets were checked against their generators.
 
 ## Delegated Android groups — 13 November 2026
 
-Both groups **pass** on device. No product defect was found, so this follow-up
-does not change application code. iOS runtime stays **not accredited**. Jira,
+Both groups **pass** on device. iOS runtime stays **not accredited**. Jira,
 merge and deploy stay with the orchestrator.
 
-Runtime APK rebuilt from commit `3af5eb4` at 11:35 ART
-(SHA-256 prefix `44D171A64241B810`) because the committed
-venue bundles were newer than the 12 November APK. Installed package
-`io.sinergiatech.padelcheck.mobile` matches that rebuilt APK. Bundle contains
-`http://127.0.0.1:18086/api`. Generated cleartext remains local QA only.
-Device: `emulator-5554`, AVD `PadelCheck_API_36`, 1206×2622 px, density 480
-(402×874 logical). API from the KAN-111 service checkout on loopback 18086,
-schema `kan111_qa` in the isolated `kan111_test` database. Two synthetic club
-admins, each with one `CLUB` context, `UNKNOWN` setup and
-`MANAGE_CLUB_SETTINGS`. No club selector and no onboarding wizard. ADB reverse
-used the forwarding proxy on 18087 for delayed real reads and for the induced
-cut; successful responses were not mocked. Reverse was removed afterwards.
+Runtime APK for groups A/B was rebuilt from commit `3af5eb4` at 11:35 ART
+because the committed venue bundles were newer than the 12 November APK.
+Installed package `io.sinergiatech.padelcheck.mobile` matched that rebuild.
+Bundle contains `http://127.0.0.1:18086/api`. Generated cleartext remains
+local QA only. Device: `emulator-5554`, AVD `PadelCheck_API_36`,
+1206×2622 px, density 480 (402×874 logical). API from the KAN-111 service
+checkout on loopback 18086, schema `kan111_qa` in the isolated `kan111_test`
+database. Two synthetic club admins, each with one `CLUB` context, `UNKNOWN`
+setup and `MANAGE_CLUB_SETTINGS`. No club selector and no onboarding wizard.
+ADB reverse used the forwarding proxy on 18087 for delayed real reads and for
+the induced cut; successful responses were not mocked. Reverse was removed
+afterwards.
 
 ### Group A — last usable venue — pass
 
@@ -179,5 +180,28 @@ legacy display text and no canonical locality. It has no venues.
   `android-first-venue-saved.png`. Back on the list, refresh shows **1 sedes ·
   1 activas** and **0 canchas**. `android-first-venue-list-refresh.png`.
 
-No in-scope correction was required. Orchestrator acceptance, Jira and merge
-authorization remain outside this evidence update.
+### Initial list loading presentation — 13 November 2026 — pass
+
+User decision the same day: while the venue list is loading for the first
+time, the footer button must show only an **animated** spinner. Visible
+`Cargando…` text and the plus icon are forbidden; the accessible name
+`Cargando sedes…` remains. Orchestrator aligned `ClubVenuesScreen` to three
+solid `#dfdfdf` 158px / radius-16 skeletons, button background `#eef0c1`, and
+`Button loading={state.loading}` with `loadingLabel="Cargando sedes…"`.
+
+An intermediate capture that still showed visible loading copy was discarded.
+Release APK rebuilt after that wiring (typecheck +
+`:app:assembleRelease` x86_64). Cold open of `padelcheck://club/settings/venues`
+against the real API through the 18087 forwarding proxy with a one-shot 10s
+venues GET delay:
+
+- Loading UI dump: button `content-desc="Cargando sedes…, busy"`,
+  `enabled="false"`, child `ProgressBar`, no `Nueva sede` / plus text.
+  `android-initial-loading.png` and `android-initial-loading-frame2.png`
+  differ (spinner arc vs later frame), proving animation.
+- After the delayed real response: list restores with the existing fixture
+  venue and `+ Nueva sede`. `android-initial-loading-settled.png`.
+
+Groups A/B evidence above stays valid and was not re-run. ADB reverse was
+removed after this check. Orchestrator acceptance, Jira and merge
+authorization remain outside this update.
