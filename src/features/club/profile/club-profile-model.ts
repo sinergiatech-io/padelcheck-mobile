@@ -95,6 +95,33 @@ export function framing(value?: Partial<ImageFraming> | null): ImageFraming {
   }
 }
 
+/** Offsets are % of the frame (−50…50); logo uses contain, cover uses cover. */
+export function framedTransform(value: ImageFraming | null | undefined, width: number, height: number) {
+  const f = framing(value)
+  return [
+    { translateX: (f.offsetX / 100) * width },
+    { translateY: (f.offsetY / 100) * height },
+    { scale: f.scale },
+  ] as const
+}
+
+const HM = /^([01]\d|2[0-3]):([0-5]\d)$/
+
+export function parseScheduleMinutes(value: string, allowEndOfDay: boolean): number | null {
+  const trimmed = value.trim()
+  if (allowEndOfDay && trimmed === '24:00') return 24 * 60
+  if (!HM.test(trimmed)) return null
+  return Number(trimmed.slice(0, 2)) * 60 + Number(trimmed.slice(3, 5))
+}
+
+export function validateOpenInterval(open: string, close: string): string | null {
+  const o = parseScheduleMinutes(open, false)
+  const c = parseScheduleMinutes(close, true)
+  if (o == null || c == null) return 'Usá HH:mm (cierre puede ser 24:00)'
+  if (o >= c) return 'La apertura debe ser anterior al cierre'
+  return null
+}
+
 function text(value: unknown) {
   return typeof value === 'string' ? value : value == null ? null : String(value)
 }

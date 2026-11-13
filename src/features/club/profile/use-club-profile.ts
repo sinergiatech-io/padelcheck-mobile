@@ -173,15 +173,15 @@ export function useClubProfile(clubId: string | null) {
     }
   }, [clubId, draft, saving, uploading, validate, saved])
 
-  const upload = useCallback(async (kind: 'logo' | 'cover', asset: MediaAsset) => {
-    if (!clubId || uploading || saving) return
+  const uploadMedia = useCallback(async (kind: 'logo' | 'cover', asset: MediaAsset): Promise<{ kind: 'logo' | 'cover'; mediaKey: string; url: string } | null> => {
+    if (!clubId || uploading || saving) return null
     if (!['image/png', 'image/jpeg', 'image/webp', 'image/jpg'].includes(asset.type)) {
       setFieldErrors(current => ({ ...current, [kind]: 'Usá PNG, JPEG o WebP' }))
-      return
+      return null
     }
     if (asset.size && asset.size > 5 * 1024 * 1024) {
       setFieldErrors(current => ({ ...current, [kind]: 'La imagen supera 5 MB' }))
-      return
+      return null
     }
     setUploading(kind)
     setFieldErrors(current => { const next = { ...current }; delete next[kind]; return next })
@@ -191,17 +191,22 @@ export function useClubProfile(clubId: string | null) {
       const value = await apiClient.postForm<{ mediaKey: string; url: string }>(
         `/clubs/${encodeURIComponent(clubId)}/media/${kind}`, form, { timeoutMs: 30000 })
       const preview = absoluteMedia(value.url, API_BASE) ?? value.url
-      if (kind === 'logo') {
-        patch({ logoUrl: preview, logoKey: value.mediaKey, clearLogo: false, logoFraming: framing() })
-      } else {
-        patch({ coverPhotoUrl: preview, coverKey: value.mediaKey, clearCover: false, coverFraming: framing() })
-      }
+      return { kind, mediaKey: value.mediaKey, url: preview }
     } catch {
       setFieldErrors(current => ({ ...current, [kind]: 'No pudimos subir la imagen. Probá de nuevo.' }))
+      return null
     } finally {
       setUploading(null)
     }
-  }, [clubId, uploading, saving, patch])
+  }, [clubId, uploading, saving])
+
+  const applyUploaded = useCallback((media: { kind: 'logo' | 'cover'; mediaKey: string; url: string }, nextFraming: ImageFraming) => {
+    if (media.kind === 'logo') {
+      patch({ logoUrl: media.url, logoKey: media.mediaKey, clearLogo: false, logoFraming: nextFraming })
+    } else {
+      patch({ coverPhotoUrl: media.url, coverKey: media.mediaKey, clearCover: false, coverFraming: nextFraming })
+    }
+  }, [patch])
 
   const setLocation = useCallback((location: Pick<LocationDto, 'provinceId' | 'provinceName' | 'localityId' | 'localityName'> | null) => {
     if (!location) {
@@ -260,7 +265,7 @@ export function useClubProfile(clubId: string | null) {
   return useMemo(() => ({
     saved, draft, loading: loading || (!!clubId && loadedFor.current !== clubId), saving, uploading,
     loadError, result, fieldErrors, dirty, actionError, statusBusy,
-    reload, patch, discard, save, upload, setLocation, deactivate, reactivate, setActionError, setFieldErrors,
+    reload, patch, discard, save, uploadMedia, applyUploaded, setLocation, deactivate, reactivate, setActionError, setFieldErrors,
   }), [saved, draft, loading, clubId, saving, uploading, loadError, result, fieldErrors, dirty, actionError, statusBusy,
-    reload, patch, discard, save, upload, setLocation, deactivate, reactivate])
+    reload, patch, discard, save, uploadMedia, applyUploaded, setLocation, deactivate, reactivate])
 }

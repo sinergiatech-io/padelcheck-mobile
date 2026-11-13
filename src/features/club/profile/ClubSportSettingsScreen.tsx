@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
+import { useRef, useState } from 'react'
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
 import { Redirect, router, usePreventRemove, type Href } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
@@ -24,8 +24,21 @@ export function ClubSportSettingsScreen() {
   const access = useClubAccess()
   const insets = useSafeAreaInsets()
   const settings = useSportSettings(access.allowed ? access.clubId : null)
-  const [discard, setDiscard] = useState(false)
-  usePreventRemove((settings.dirty || settings.saving || !!settings.dayDraft) && !discard, () => setDiscard(true))
+  const [weekDiscard, setWeekDiscard] = useState(false)
+  const [dayDiscard, setDayDiscard] = useState(false)
+  const pendingNav = useRef<Href | null>(null)
+
+  usePreventRemove((settings.dirty || settings.saving || !!settings.dayDraft) && !weekDiscard && !dayDiscard, ({ data }) => {
+    if (settings.saving) return
+    if (settings.dayDraft) {
+      setDayDiscard(true)
+      return
+    }
+    pendingNav.current = data.action.type === 'GO_BACK'
+      ? (HOME as Href)
+      : ((data.action.payload as { href?: string } | undefined)?.href as Href | undefined) ?? (HOME as Href)
+    setWeekDiscard(true)
+  })
 
   if (access.phase === 'checking') return <View style={s.center}><ActivityIndicator /></View>
   if (access.phase === 'unverified') return <SessionUnverified />
@@ -42,7 +55,7 @@ export function ClubSportSettingsScreen() {
           <StatusBar style="light" />
           <View style={{ flex: 1, backgroundColor: '#f7f7f7' }}>
             <View style={s.header}>
-              <Pressable onPress={() => settings.setDayDraft(null)} style={s.iconBtn}><Text style={{ color: '#fff', fontSize: 22 }}>←</Text></Pressable>
+              <Pressable accessibilityLabel="Volver" onPress={() => setDayDiscard(true)} style={s.iconBtn}><Text style={{ color: '#fff', fontSize: 22 }}>←</Text></Pressable>
               <Text style={s.title}>Horario del {label.toLowerCase()}</Text>
             </View>
             <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
@@ -66,7 +79,7 @@ export function ClubSportSettingsScreen() {
                     const intervals = day.value.intervals.map((item, i) => i === index ? { ...item, open: openTime } : item)
                     settings.setDayDraft({ day: day.day, value: { ...day.value, intervals } })
                   }} />
-                  <TextInput value={interval.close} placeholder="HH:mm cierre" style={field} onChangeText={close => {
+                  <TextInput value={interval.close} placeholder="HH:mm o 24:00 cierre" style={field} onChangeText={close => {
                     const intervals = day.value.intervals.map((item, i) => i === index ? { ...item, close } : item)
                     settings.setDayDraft({ day: day.day, value: { ...day.value, intervals } })
                   }} />
@@ -80,6 +93,15 @@ export function ClubSportSettingsScreen() {
             </ScrollView>
             <View style={{ padding: 16 }}><Button onPress={() => settings.applyDay()}>Aplicar horario</Button></View>
           </View>
+          <Modal transparent visible={dayDiscard} animationType="fade" onRequestClose={() => setDayDiscard(false)}>
+            <View style={s.overlay}>
+              <View style={s.dialog}>
+                <Text style={{ fontSize: 18, fontWeight: '600' }}>¿Descartar cambios del día?</Text>
+                <Button variant="secondary" onPress={() => setDayDiscard(false)}>Seguir editando</Button>
+                <Button onPress={() => { settings.setDayDraft(null); setDayDiscard(false) }}>Descartar</Button>
+              </View>
+            </View>
+          </Modal>
         </SafeAreaView>
       </StartupReady>
     )
@@ -92,8 +114,10 @@ export function ClubSportSettingsScreen() {
         <View style={{ flex: 1, backgroundColor: '#f7f7f7' }}>
           <View style={s.header}>
             <Pressable disabled={settings.saving} onPress={() => {
-              if (settings.dirty) setDiscard(true)
-              else router.replace(HOME as Href)
+              if (settings.dirty) {
+                pendingNav.current = HOME as Href
+                setWeekDiscard(true)
+              } else router.replace(HOME as Href)
             }} style={s.iconBtn}><Text style={{ color: '#fff', fontSize: 22 }}>←</Text></Pressable>
             <Text style={s.title}>Configuración de torneos</Text>
           </View>
@@ -130,15 +154,21 @@ export function ClubSportSettingsScreen() {
             </View>
           )}
           <ClubBottomNav onDashboard={() => router.replace('/dashboard')} onClub={() => router.replace(HOME as Href)} busy={settings.saving} bottomInset={insets.bottom} />
-          {discard && (
+          <Modal transparent visible={weekDiscard} animationType="fade" onRequestClose={() => setWeekDiscard(false)}>
             <View style={s.overlay}>
               <View style={s.dialog}>
                 <Text style={{ fontSize: 18, fontWeight: '600' }}>¿Descartar cambios de la semana?</Text>
-                <Button variant="secondary" onPress={() => setDiscard(false)}>Seguir editando</Button>
-                <Button onPress={() => { settings.discard(); setDiscard(false); router.replace(HOME as Href) }}>Descartar cambios</Button>
+                <Button variant="secondary" onPress={() => { setWeekDiscard(false); pendingNav.current = null }}>Seguir editando</Button>
+                <Button onPress={() => {
+                  settings.discard()
+                  const dest = pendingNav.current ?? (HOME as Href)
+                  pendingNav.current = null
+                  setWeekDiscard(false)
+                  requestAnimationFrame(() => router.replace(dest))
+                }}>Descartar cambios</Button>
               </View>
             </View>
-          )}
+          </Modal>
         </View>
       </SafeAreaView>
     </StartupReady>

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 import {
-  emptyDay, emptyWeek, parseSportSettings, type DaySchedule, type SportSettings, type Weekday, type WeeklySchedule,
+  emptyDay, emptyWeek, parseScheduleMinutes, parseSportSettings, validateOpenInterval,
+  type DaySchedule, type SportSettings, type Weekday, type WeeklySchedule,
 } from './club-profile-model'
 
 function clone(settings: SportSettings): SportSettings {
@@ -13,9 +14,15 @@ function validateDay(day: DaySchedule): string | null {
   if (!day.intervals.length) return 'Agregá al menos una franja o marcá el día como cerrado'
   for (const interval of day.intervals) {
     if (!interval.open || !interval.close) return 'Completá apertura y cierre'
-    if (interval.open >= interval.close) return 'La apertura debe ser anterior al cierre'
+    const invalid = validateOpenInterval(interval.open, interval.close)
+    if (invalid) return invalid
   }
-  const sorted = [...day.intervals].sort((a, b) => a.open.localeCompare(b.open))
+  const sorted = [...day.intervals]
+    .map(interval => ({
+      open: parseScheduleMinutes(interval.open, false)!,
+      close: parseScheduleMinutes(interval.close, true)!,
+    }))
+    .sort((a, b) => a.open - b.open)
   for (let i = 1; i < sorted.length; i++) {
     if (sorted[i - 1].close > sorted[i].open) return 'Las franjas no pueden solaparse'
   }
