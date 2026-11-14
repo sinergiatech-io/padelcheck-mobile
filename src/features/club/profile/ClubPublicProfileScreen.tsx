@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
-import { ActivityIndicator, Image, Linking, Pressable, Text, View } from 'react-native'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ActivityIndicator, Linking, Pressable, Text, View } from 'react-native'
 import { router, useLocalSearchParams, type Href } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
+import { SvgXml } from 'react-native-svg'
 import { Button } from '@/components/ui/button'
 import { RefreshableScrollView } from '@/components/ui/refreshable-scroll-view'
 import { useRefreshControl } from '@/hooks/use-refresh-control'
@@ -11,7 +12,9 @@ import { apiClient } from '@/lib/api-client'
 import { API_BASE } from '@/lib/constants'
 import { StartupReady } from '@/features/startup/StartupReady'
 import { ClubBottomNav, PlayerBottomNav } from '../category-policy/ClubBottomNav'
-import { absoluteMedia, parsePublic, type ClubPublicProfile } from './club-profile-model'
+import { absoluteMedia, framing, parsePublic, type ClubPublicProfile } from './club-profile-model'
+import { FramedImage } from './FramedImage'
+import { venueIcons } from '../venues/venue-icons'
 
 function whatsappHref(phone: string) {
   const digits = phone.replace(/\D/g, '')
@@ -30,26 +33,38 @@ export function ClubPublicProfileScreen({ preview = false }: { preview?: boolean
   const [profile, setProfile] = useState<ClubPublicProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const request = useRef<{ clubId: string; abort: AbortController; promise: Promise<void> } | null>(null)
 
-  const load = useCallback(async (signal?: AbortSignal) => {
-    if (!clubId) return
-    setError(false)
-    try {
-      const value = await apiClient.get<unknown>(`/clubs/${encodeURIComponent(clubId)}/public`, { signal, timeoutMs: 15000 })
-      if (signal?.aborted) return
-      setProfile(parsePublic(value))
-    } catch {
-      if (!signal?.aborted) setError(true)
-    } finally {
-      if (!signal?.aborted) setLoading(false)
+  const load = useCallback((): Promise<void> => {
+    if (!clubId) {
+      setLoading(false)
+      setError(true)
+      return Promise.resolve()
     }
+    if (request.current?.clubId === clubId && !request.current.abort.signal.aborted) return request.current.promise
+    request.current?.abort.abort()
+    const abort = new AbortController()
+    setError(false)
+    const promise = (async () => {
+      try {
+        const value = await apiClient.get<unknown>(`/clubs/${encodeURIComponent(clubId)}/public`, { signal: abort.signal, timeoutMs: 15000 })
+        if (!abort.signal.aborted) setProfile(parsePublic(value))
+      } catch {
+        if (!abort.signal.aborted) setError(true)
+      } finally {
+        if (!abort.signal.aborted) setLoading(false)
+        if (request.current?.abort === abort) request.current = null
+      }
+    })()
+    request.current = { clubId, abort, promise }
+    return promise
   }, [clubId])
 
   useEffect(() => {
+    setProfile(null)
     setLoading(true)
-    const abort = new AbortController()
-    void load(abort.signal)
-    return () => abort.abort()
+    void load()
+    return () => { request.current?.abort.abort() }
   }, [load])
 
   const refresh = useRefreshControl(async () => {
@@ -61,33 +76,36 @@ export function ClubPublicProfileScreen({ preview = false }: { preview?: boolean
   const hasContact = Boolean(profile?.contactPhone || profile?.contactEmail)
   const hasSocial = Boolean(profile?.instagramUrl || profile?.facebookUrl)
   const wa = profile?.contactPhone ? whatsappHref(profile.contactPhone) : null
+  const locationLabel = [...new Set([profile?.city, profile?.countryDivision].filter(Boolean))].join(', ')
 
   return (
     <StartupReady>
       <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#100e16' }}>
         <StatusBar style="light" />
         <View style={{ flex: 1, backgroundColor: '#f7f7f7' }}>
-          <View style={{ height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8 }}>
+          <View style={{ height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, backgroundColor: '#100e16' }}>
             <Pressable accessibilityRole="button" accessibilityLabel="Volver" onPress={() => preview ? router.replace('/club/settings/info' as Href) : router.back()}
               style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
               <Text className="font-inter-500" style={{ color: '#fff', fontSize: 22 }}>←</Text>
             </Pressable>
-            <Text className="font-inter-700" style={{ color: '#fff', fontSize: 20 }}>{preview ? 'Vista previa pública' : 'Perfil del club'}</Text>
+            <Text className="font-inter-700" style={{ color: '#fff', fontSize: 20 }}>{preview ? 'Vista previa del club' : 'Perfil del club'}</Text>
           </View>
           <RefreshableScrollView refreshing={refresh.refreshing} onRefresh={refresh.onRefresh} contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 24 }}>
-            {loading ? <ActivityIndicator style={{ marginTop: 24 }} />
-              : error ? <View style={{ gap: 12 }}><Text className="font-sans">No pudimos cargar el perfil.</Text><Button onPress={() => { setLoading(true); void load() }}>Reintentar</Button></View>
+            {preview && <View style={{ minHeight: 78, flexDirection: 'row', gap: 12, alignItems: 'center', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#c2d8fc', backgroundColor: '#ebf3fe' }}>
+              <SvgXml xml={venueIcons.info.xml} width={24} height={24} />
+              <View style={{ flex: 1, gap: 2 }}><Text className="font-inter-600" style={{ fontSize: 14 }}>Vista previa</Text><Text className="font-sans" style={{ fontSize: 12, color: '#605e64' }}>Mostramos los datos guardados.</Text></View>
+            </View>}
+            {error && <View style={{ gap: 12 }}><Text className="font-sans">{profile ? 'No pudimos actualizar el perfil. Mostramos los últimos datos disponibles.' : 'No pudimos cargar el perfil.'}</Text><Button onPress={() => { if (!profile) setLoading(true); void load() }}>Reintentar</Button></View>}
+            {loading && !profile ? <ActivityIndicator style={{ marginTop: 24 }} />
                 : profile && <>
                   <View style={{ backgroundColor: '#fff', borderRadius: 12, overflow: 'hidden' }}>
-                    {cover ? <Image source={{ uri: cover }} style={{ width: '100%', aspectRatio: 370 / 184 }} /> : null}
+                    {cover ? <FramedImage uri={cover} framingValue={framing(profile.coverFraming)} mode="cover" style={{ width: '100%', aspectRatio: 370 / 184 }} /> : null}
                     <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', padding: 16 }}>
-                      {logo
-                        ? <Image source={{ uri: logo }} style={{ width: 64, height: 64, borderRadius: 12 }} />
-                        : <View style={{ width: 64, height: 64, borderRadius: 12, backgroundColor: '#e7e7e8' }} />}
+                      {logo ? <FramedImage uri={logo} framingValue={framing(profile.logoFraming)} mode="contain" style={{ width: 64, height: 64, borderRadius: 12 }} /> : null}
                       <View style={{ flex: 1 }}>
                         <Text className="font-inter-700" style={{ fontSize: 20 }} numberOfLines={1}>{profile.name}</Text>
-                        {(profile.city || profile.countryDivision)
-                          ? <Text className="font-sans" style={{ color: '#605e64' }}>{[profile.city, profile.countryDivision].filter(Boolean).join(', ')}</Text>
+                        {locationLabel
+                          ? <Text className="font-sans" style={{ color: '#605e64' }}>{locationLabel}</Text>
                           : null}
                       </View>
                     </View>

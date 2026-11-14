@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { Redirect, router, usePreventRemove, type Href } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
@@ -10,7 +10,8 @@ import { useAuth } from '@/context/AuthContext'
 import { SessionUnverified } from '@/features/auth/SessionUnverified'
 import { StartupReady } from '@/features/startup/StartupReady'
 import { ClubBottomNav } from '../category-policy/ClubBottomNav'
-import { framedTransform, framing, type ImageFraming } from './club-profile-model'
+import { framing, type ImageFraming } from './club-profile-model'
+import { FramedImage } from './FramedImage'
 import { ClubGeoFields } from './ClubGeoFields'
 import { useClubProfile } from './use-club-profile'
 
@@ -22,30 +23,6 @@ function useClubAccess() {
   const { user, destination, phase } = useAuth()
   const context = destination?.kind === 'club' ? user?.accessContexts?.find(c => c.activity === 'CLUB' && c.clubId === destination.clubId) : null
   return { phase, destination, allowed: phase === 'ready' && Boolean(context?.permissions?.includes('MANAGE_CLUB_SETTINGS')), clubId: context?.clubId ?? null }
-}
-
-function FramedImage({ uri, framingValue, mode, style }: {
-  uri: string
-  framingValue: ImageFraming
-  mode: 'contain' | 'cover'
-  style: object
-}) {
-  const [size, setSize] = useState({ width: 0, height: 0 })
-  return (
-    <View style={[style, { overflow: 'hidden' }]} onLayout={e => setSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}>
-      {size.width > 0 && (
-        <Image
-          source={{ uri }}
-          resizeMode={mode}
-          style={{
-            width: size.width,
-            height: size.height,
-            transform: [...framedTransform(framingValue, size.width, size.height)],
-          }}
-        />
-      )}
-    </View>
-  )
 }
 
 function FramingEditor({ title, src, initial, aspect, onCancel, onApply }: {
