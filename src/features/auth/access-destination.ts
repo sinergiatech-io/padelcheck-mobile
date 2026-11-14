@@ -149,6 +149,8 @@ export function guardRedirect(
   }
   const clubRoot = platform === 'web' ? WEB_CLUB_ROOT : NATIVE_CLUB_ROOT
   const clubSettings = path === '/club/settings' || path === '/club/settings/categories'
+    || path === '/club/settings/info' || path === '/club/settings/info/preview'
+    || path === '/club/settings/tournaments'
     || path === '/club/settings/venues' || path.startsWith('/club/settings/venues/')
   return path === clubRoot || clubSettings || platform === 'native' && path === '/club' ? null : clubRoot
 }

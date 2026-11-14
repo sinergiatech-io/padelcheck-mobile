@@ -64,7 +64,9 @@ export function createApiClient({ baseUrl, getToken, credentials }: ClientConfig
     }
     const token = await getToken()
     const headers = new Headers(init.headers)
-    if (init.body != null && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
+    if (init.body != null && !(typeof FormData !== 'undefined' && init.body instanceof FormData) && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json')
+    }
     if (token) headers.set('Authorization', `Bearer ${token}`)
     const controller = new AbortController()
     let timedOut = false
@@ -139,6 +141,8 @@ export function createApiClient({ baseUrl, getToken, credentials }: ClientConfig
   return {
     get: <T>(path: string, options?: ApiRequestOptions) => request<T>(path, { ...options, method: 'GET' }),
     post: <T>(path: string, body?: unknown, options?: ApiRequestOptions) => write<T>('POST', path, body, options),
+    postForm: <T>(path: string, body: FormData, options?: ApiRequestOptions) =>
+      request<T>(path, { ...options, method: 'POST', body }),
     put: <T>(path: string, body?: unknown, options?: ApiRequestOptions) => write<T>('PUT', path, body, options),
     patch: <T>(path: string, body?: unknown, options?: ApiRequestOptions) => write<T>('PATCH', path, body, options),
     delete: <T = void>(path: string, options?: ApiRequestOptions) => request<T>(path, { ...options, method: 'DELETE' }),
