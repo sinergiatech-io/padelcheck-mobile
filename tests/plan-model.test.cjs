@@ -1,6 +1,7 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const plan = require(process.env.PLAN_TEST_MODULE)
+const { createPlanReads } = require(process.env.PLAN_LOAD_TEST_MODULE)
 
 const eventId = '11111111-1111-1111-1111-111111111111'
 const reference = 'pcabcdef1234567890'
@@ -126,6 +127,74 @@ test('catalog choices do not activate a paid open plan and adjustment is explici
   assert.deepEqual(choices.map(item => item.kind + item.planCode), ['adjustmentELITE'])
 })
 
+test('catalog choices accept only a published monthly price', () => {
+  const current = plan.parseSubscription(subscription({
+    planCode: 'FREE', status: 'ACTIVE',
+    actions: { fullCheckout: true, requestAdjustmentQuote: false },
+  }))
+  const offers = [
+    { code: 'PRO', name: 'Pro', free: false, features: [], price: { status: 'AVAILABLE', amount: '10000.00', currency: 'ARS', period: 'YEAR' } },
+    { code: 'ELITE', name: 'Elite', free: false, features: [], price: { status: 'PENDING', amount: null, currency: null, period: null } },
+    { code: 'PRO', name: 'Pro mensual', free: false, features: [], price: { status: 'AVAILABLE', amount: '10000.00', currency: 'ARS', period: 'MONTH' } },
+  ]
+  const choices = plan.upgradeChoices(current, offers)
+  assert.deepEqual(choices.map(item => `${item.kind}:${item.planCode}:${item.amount ?? ''}`), ['checkout:PRO:10000.00'])
+  const pending = plan.parseSubscription(subscription({
+    requestedPlan: { planCode: 'ELITE', status: 'PENDING_PAYMENT', chargeOutcome: 'NONE' },
+    actions: { fullCheckout: true, requestAdjustmentQuote: false },
+  }))
+  assert.equal(plan.completeChoice(pending, offers).kind, 'unavailable')
+  const proPending = plan.parseSubscription(subscription({
+    requestedPlan: { planCode: 'PRO', status: 'PENDING_PAYMENT', chargeOutcome: 'NONE' },
+    actions: { fullCheckout: true, requestAdjustmentQuote: false },
+  }))
+  const complete = plan.completeChoice(proPending, offers)
+  assert.equal(complete.kind, 'checkout')
+  if (complete.kind === 'checkout') assert.equal(complete.choice.amount, '10000.00')
+})
+
+test('a resume conflict is reread, and another 409 is not treated as an active renewal', () => {
+  assert.equal(plan.conflictOutcome('resume', 409), 'reread-resume')
+  assert.equal(plan.conflictOutcome('checkout', 409), 'recoverable')
+  assert.equal(plan.conflictOutcome('quote', 409), 'recoverable')
+  assert.equal(plan.conflictOutcome('resume', 500), null)
+  assert.equal(plan.resumeConfirmation(plan.parseSubscription(subscription({ recurrencePaused: false, recurrenceResumeAction: null }))), 'resumed')
+  assert.equal(plan.resumeConfirmation(plan.parseSubscription(subscription({ recurrencePaused: true, recurrenceResumeAction: 'RESUME_RENEWAL' }))), 'pending')
+  assert.equal(plan.resumeConfirmation(null), 'unknown')
+})
+
+test('opening a link rereads the same charge and refuses an expired, canceled or foreign result', () => {
+  const link = { clubId: 'c1', planCode: 'ELITE', amount: '5000.00', currency: 'ARS', url: 'https://billing.test/checkout/pcabcdef1234567890', reference }
+  const charge = {
+    reference, kind: 'ADJUSTMENT', planCode: 'ELITE', status: 'OPEN', amount: '5000.00', currency: 'ARS',
+    periodStart: '2026-11-01', periodEnd: '2026-12-01', confirmed: false, manualResolution: false,
+    terms: { amount: '5000.00', currency: 'ARS', periodStart: '2026-11-01', periodEnd: '2026-12-01', payUntil: '2026-11-18T03:00:00Z', eliteMonthlyAmount: '20000.00', eliteMonthlyCurrency: 'ARS' },
+  }
+  const shown = plan.chargeMaterial(charge)
+  const now = Date.parse('2026-11-17T12:00:00Z')
+  assert.equal(plan.decideOpen({ clubId: 'c1', link, charge, readFailed: false, shown, nowMs: now }).kind, 'open')
+  assert.equal(plan.decideOpen({ clubId: 'c1', link, charge, readFailed: false, shown, nowMs: Date.parse('2026-11-18T03:00:00Z') }).kind, 'expired')
+  assert.equal(plan.decideOpen({ clubId: 'c1', link, charge, readFailed: false, shown, nowMs: Date.parse('2026-11-18T03:00:00Z') }).requote, true)
+  assert.equal(plan.decideOpen({ clubId: 'c1', link, charge: { ...charge, status: 'APPLIED', confirmed: true }, readFailed: false, shown, nowMs: now }).kind, 'applied')
+  assert.equal(plan.decideOpen({ clubId: 'c1', link, charge: { ...charge, status: 'CANCELED' }, readFailed: false, shown, nowMs: now }).kind, 'canceled')
+  assert.equal(plan.decideOpen({ clubId: 'c1', link, charge: { ...charge, status: 'UNCERTAIN' }, readFailed: false, shown, nowMs: now }).kind, 'uncertain')
+  assert.equal(plan.decideOpen({ clubId: 'other', link, charge, readFailed: false, shown, nowMs: now }).kind, 'mismatch')
+  assert.equal(plan.decideOpen({ clubId: 'c1', link, charge: null, readFailed: true, shown, nowMs: now }).kind, 'unavailable')
+  assert.equal(plan.sameServerUrl(link.url, 'https://billing.test/checkout/other'), false)
+  assert.equal(plan.sameServerUrl(link.url, link.url), true)
+})
+
+test('advanced stats stay marked as later work even when the plan enables them', () => {
+  const lines = plan.capabilityLines({
+    code: 'PRO', name: 'Pro', free: false, features: [
+      { key: 'ADVANCED_STATS', state: 'ENABLED' },
+      { key: 'CUSTOM_BRANDING', state: 'ENABLED' },
+      { key: 'PRIORITY_SUPPORT', state: 'DISABLED' },
+    ], price: null,
+  })
+  assert.deepEqual(lines, ['Estadísticas avanzadas · Post-MVP', 'Marca personalizada', 'Soporte estándar'])
+})
+
 test('a changed adjustment snapshot must be confirmed again and a browser close is not a result', () => {
   const quote = { available: true, amount: '5000.00', currency: 'ARS', periodEnd: '2026-12-01', payUntil: '2026-11-18T03:00:00Z' }
   const same = { ...plan.quoteMaterial(quote), periodStart: null }
@@ -144,8 +213,6 @@ test('a changed adjustment snapshot must be confirmed again and a browser close 
   assert.equal(plan.isSafePaymentUrl('https://pay.example/checkout?token=secret'), false)
   assert.equal(plan.isSafePaymentUrl('https://pay.example/checkout?source=padel'), true)
   assert.equal(plan.isSafePaymentUrl('http://pay.example/checkout'), false)
-  assert.equal(plan.resumeAlreadyActive(409), true)
-  assert.equal(plan.resumeAlreadyActive(500), false)
 })
 
 test('the opaque reference follows only the same user and club', () => {
@@ -166,3 +233,87 @@ test('pending outcome none is not a failure and confirmed does not relabel the a
   assert.match(plan.pendingBanner(confirmed, 'FREE').body, /plan vigente/)
   assert.equal(plan.parseSubscription(subscription({ requestedPlan: { planCode: 'PRO', status: 'PAID', chargeOutcome: 'CONFIRMED' } })).requestedPlan, null)
 })
+
+function deferred() {
+  let resolve
+  let reject
+  const promise = new Promise((ok, fail) => { resolve = ok; reject = fail })
+  return { promise, resolve, reject }
+}
+
+function subscriptionBody(clubId) {
+  return {
+    clubId, planCode: 'FREE', status: 'ACTIVE', actions: { fullCheckout: false, requestAdjustmentQuote: false },
+  }
+}
+
+function usageBody(clubId) {
+  return {
+    clubId, planCode: 'FREE', status: 'ACTIVE', subscriptionPlanCode: 'FREE', plan: null,
+    club: {
+      activeTournaments: { key: 'activeTournaments', state: 'LIMITED', limit: 1, used: 0, warning: false, reached: false, exceeded: false },
+      staffUsers: { key: 'staffUsers', state: 'LIMITED', limit: 1, used: 0, warning: false, reached: false, exceeded: false },
+    },
+    event: null,
+  }
+}
+
+test('a club change does not join the previous refresh or keep its result', async () => {
+  const first = deferred()
+  const second = deferred()
+  const calls = []
+  const client = {
+    loadAttempt: async () => null,
+    saveAttempt: async () => {},
+    events: async () => [],
+    charge: async () => { throw new Error('no charge') },
+    subscription: (clubId) => {
+      calls.push(clubId)
+      return clubId === 'club-a' ? first.promise : second.promise
+    },
+    usage: async (clubId) => usageBody(clubId),
+  }
+  const session = createPlanReads(client)
+  const context = (clubId) => ({ clubId, userId: 'user', listEvents: false, enabled: true })
+  const older = session.refresh(context('club-a'))
+  await Promise.resolve()
+  session.reset()
+  const newer = session.refresh(context('club-b'))
+  await Promise.resolve()
+  first.resolve(subscriptionBody('club-a'))
+  await older
+  assert.equal(session.snapshot().subscription, null)
+  assert.equal(session.snapshot().loading, true)
+  second.resolve(subscriptionBody('club-b'))
+  await newer
+  assert.equal(session.snapshot().subscription.clubId, 'club-b')
+  assert.equal(session.snapshot().loading, false)
+  assert.equal(session.snapshot().refreshing, false)
+  assert.deepEqual(calls, ['club-a', 'club-b'])
+})
+
+test('the same context joins one refresh and a revoked context clears it', async () => {
+  const gate = deferred()
+  let calls = 0
+  const client = {
+    loadAttempt: async () => null,
+    saveAttempt: async () => {},
+    events: async () => [],
+    charge: async () => { throw Object.assign(new Error('missing'), { status: 404 }) },
+    subscription: () => { calls += 1; return gate.promise },
+    usage: async (clubId) => usageBody(clubId),
+  }
+  const session = createPlanReads(client)
+  const context = { clubId: 'club-a', userId: 'user', listEvents: false, enabled: true }
+  const first = session.refresh(context)
+  const joined = session.refresh(context)
+  assert.equal(first, joined)
+  gate.resolve(subscriptionBody('club-a'))
+  await first
+  assert.equal(calls, 1)
+  assert.equal(session.snapshot().subscription.clubId, 'club-a')
+  session.reset()
+  assert.equal(session.snapshot().subscription, null)
+  assert.equal(session.snapshot().loading, false)
+})
+

@@ -700,12 +700,18 @@ export function capabilityLines(plan: PlanOffer | null): string[] {
   for (const feature of plan.features) {
     if (feature.state === 'ABSENT') continue
     if (feature.key === 'CUSTOM_BRANDING' && feature.state === 'ENABLED') lines.push('Marca personalizada')
-    if (feature.key === 'ADVANCED_STATS' && feature.state === 'ENABLED') lines.push('Estadísticas avanzadas')
-    if (feature.key === 'ADVANCED_STATS' && feature.state === 'DISABLED') lines.push('Estadísticas avanzadas · Post-MVP')
+    if (feature.key === 'ADVANCED_STATS' && (feature.state === 'ENABLED' || feature.state === 'DISABLED')) lines.push('Estadísticas avanzadas · Post-MVP')
     if (feature.key === 'PRIORITY_SUPPORT' && feature.state === 'ENABLED') lines.push('Soporte prioritario')
     if (feature.key === 'PRIORITY_SUPPORT' && feature.state === 'DISABLED') lines.push('Soporte estándar')
   }
   return lines
+}
+
+export function monthlyPrice(offer: PlanOffer | null | undefined): { amount: string; currency: string } | null {
+  if (!offer || offer.free) return null
+  const price = offer.price
+  if (!price || price.status !== 'AVAILABLE' || price.period !== 'MONTH' || !price.amount || !price.currency) return null
+  return { amount: price.amount, currency: price.currency }
 }
 
 export function upgradeChoices(subscription: ClubSubscription, catalog: PlanOffer[]): UpgradeChoice[] {
@@ -716,20 +722,30 @@ export function upgradeChoices(subscription: ClubSubscription, catalog: PlanOffe
   if (subscription.actions.fullCheckout) {
     for (const offer of catalog) {
       if (offer.code !== 'PRO' && offer.code !== 'ELITE') continue
-      if (offer.free || offer.price?.status !== 'AVAILABLE') continue
+      const price = monthlyPrice(offer)
+      if (!price) continue
       if (subscription.actions.requestAdjustmentQuote && offer.code === 'ELITE') continue
       const paidOpen = subscription.commercialPeriod?.kind === 'PAID' && subscription.commercialPeriod.open && subscription.commercialPeriod.planCode === offer.code
       if (paidOpen) continue
-      choices.push({
-        kind: 'checkout',
-        planCode: offer.code,
-        name: offer.name,
-        amount: offer.price?.amount ?? null,
-        currency: offer.price?.currency ?? null,
-      })
+      choices.push({ kind: 'checkout', planCode: offer.code, name: offer.name, amount: price.amount, currency: price.currency })
     }
   }
   return choices
+}
+
+export type CompleteChoice =
+  | { kind: 'adjustment' }
+  | { kind: 'checkout'; choice: Extract<UpgradeChoice, { kind: 'checkout' }> }
+  | { kind: 'unavailable' }
+
+export function completeChoice(subscription: ClubSubscription, catalog: PlanOffer[]): CompleteChoice {
+  if (completeUsesAdjustment(subscription)) return { kind: 'adjustment' }
+  const code = subscription.requestedPlan?.planCode
+  if (code !== 'PRO' && code !== 'ELITE') return { kind: 'unavailable' }
+  const offer = catalog.find(item => item.code === code && monthlyPrice(item))
+  const price = monthlyPrice(offer)
+  if (!offer || !price) return { kind: 'unavailable' }
+  return { kind: 'checkout', choice: { kind: 'checkout', planCode: code, name: offer.name, amount: price.amount, currency: price.currency } }
 }
 
 export function primaryAction(subscription: ClubSubscription | null, canManage: boolean): 'complete' | 'upgrade' | 'browse' | null {
@@ -778,6 +794,61 @@ export function readBillingAttempt(value: unknown, userId: string, clubId: strin
   return isChargeReference(text(source.reference) ?? undefined) ? text(source.reference) : null
 }
 
-export function resumeAlreadyActive(status: number): boolean {
-  return status === 409
+export type BillingOperation = 'checkout' | 'quote' | 'resume' | 'plans' | 'authorize' | 'read'
+
+export function conflictOutcome(operation: BillingOperation, status: number): 'reread-resume' | 'recoverable' | null {
+  if (status !== 409) return null
+  return operation === 'resume' ? 'reread-resume' : 'recoverable'
+}
+
+export function resumeConfirmation(subscription: ClubSubscription | null): 'resumed' | 'pending' | 'unknown' {
+  if (!subscription) return 'unknown'
+  if (subscription.recurrenceResumeAction || subscription.recurrencePaused === true) return 'pending'
+  if (subscription.recurrencePaused === false) return 'resumed'
+  return 'unknown'
+}
+
+export type OpenDecision =
+  | { kind: 'open' }
+  | { kind: 'applied' }
+  | { kind: 'manual' }
+  | { kind: 'failed' }
+  | { kind: 'canceled' }
+  | { kind: 'uncertain' }
+  | { kind: 'expired'; requote: boolean }
+  | { kind: 'mismatch' }
+  | { kind: 'unavailable' }
+
+export function sameServerUrl(expected: string | null | undefined, actual: string | null | undefined): boolean {
+  return Boolean(expected && actual === expected && isSafePaymentUrl(expected))
+}
+
+export function decideOpen(input: {
+  clubId: string
+  link: CheckoutLink
+  charge: BillingCharge | null
+  readFailed: boolean
+  shown: MaterialTerms
+  nowMs: number
+}): OpenDecision {
+  if (input.readFailed || !input.charge) return { kind: 'unavailable' }
+  const charge = input.charge
+  if (input.link.clubId !== input.clubId || charge.reference !== input.link.reference) return { kind: 'mismatch' }
+  if (charge.planCode && charge.planCode !== input.link.planCode) return { kind: 'mismatch' }
+  if (!isSafePaymentUrl(input.link.url)) return { kind: 'mismatch' }
+  if (input.link.amount && charge.amount && normalizeMoney(input.link.amount) !== normalizeMoney(charge.amount)) return { kind: 'mismatch' }
+  if (input.link.currency && charge.currency && input.link.currency !== charge.currency) return { kind: 'mismatch' }
+  if (charge.confirmed || charge.status === 'APPLIED') return { kind: 'applied' }
+  if (charge.manualResolution || charge.status === 'UNAPPLIED') return { kind: 'manual' }
+  if (charge.status === 'FAILED') return { kind: 'failed' }
+  if (charge.status === 'CANCELED') return { kind: 'canceled' }
+  if (charge.status === 'UNCERTAIN') return { kind: 'uncertain' }
+  const terms = chargeMaterial(charge)
+  if (materialChanged(input.shown, terms)) return { kind: 'mismatch' }
+  if (terms.payUntil) {
+    const expiry = Date.parse(terms.payUntil)
+    if (!Number.isFinite(expiry) || expiry <= input.nowMs) return { kind: 'expired', requote: charge.kind === 'ADJUSTMENT' }
+  }
+  if (charge.status !== 'OPEN' && charge.status !== 'OPENING') return { kind: 'uncertain' }
+  return { kind: 'open' }
 }

@@ -23,9 +23,9 @@ import {
   catalogMaterial,
   chargeBanner,
   chargeMaterial,
-  completeUsesAdjustment,
-  isSafePaymentUrl,
-  materialChanged,
+  completeChoice,
+  conflictOutcome,
+  decideOpen,
   meterCaption,
   meterLabel,
   meterValue,
@@ -33,10 +33,12 @@ import {
   planHeadline,
   primaryAction,
   quoteMaterial,
-  resumeAlreadyActive,
+  resumeConfirmation,
+  sameServerUrl,
   upgradeChoices,
   usageBanners,
   type AdjustmentQuote,
+  type BillingOperation,
   type CheckoutLink,
   type MaterialTerms,
   type UpgradeChoice,
@@ -95,7 +97,7 @@ export function ClubPlanScreen() {
   const canManage = canView && permissions.includes('MANAGE_SUBSCRIPTION')
   const canEvents = canView && permissions.includes('MANAGE_TOURNAMENTS')
   const plan = useClubPlan(context?.clubId ?? null, user?.userId ?? null, canEvents, canView)
-  const refresh = useRefreshControl(() => plan.refresh())
+  const refresh = useRefreshControl(async () => { await plan.refresh() })
   const [step, setStep] = useState<PlanStep>({ name: 'closed' })
   const [busy, setBusy] = useState(false)
   const [awaitingReturn, setAwaitingReturn] = useState(false)
@@ -103,6 +105,34 @@ export function ClubPlanScreen() {
   const consented = useRef<MaterialTerms | null>(null)
   const pendingLink = useRef<CheckoutLink | null>(null)
   const actionLock = useRef(false)
+  const journeyEpoch = useRef(0)
+  const authorizedUrl = useRef<string | null>(null)
+  const clubId = destination?.kind === 'club' ? destination.clubId : null
+  const contextKey = `${user?.userId ?? ''}|${clubId ?? ''}|${canView}|${canManage}`
+  const contextKeyRef = useRef(contextKey)
+  const live = useRef({ clubId, userId: user?.userId ?? null })
+  live.current = { clubId, userId: user?.userId ?? null }
+  const firstContext = useRef(true)
+  useEffect(() => {
+    if (firstContext.current) {
+      firstContext.current = false
+      contextKeyRef.current = contextKey
+      return
+    }
+    journeyEpoch.current += 1
+    contextKeyRef.current = contextKey
+    pendingLink.current = null
+    consented.current = null
+    authorizedUrl.current = null
+    actionLock.current = false
+    setStep({ name: 'closed' })
+    setBusy(false)
+    setAwaitingReturn(false)
+    setSelector(false)
+  }, [contextKey])
+  useEffect(() => () => { journeyEpoch.current += 1 }, [])
+  const capture = () => ({ epoch: journeyEpoch.current, key: contextKeyRef.current, clubId: live.current.clubId, userId: live.current.userId })
+  const active = (token: ReturnType<typeof capture>) => token.epoch === journeyEpoch.current && token.key === contextKeyRef.current && token.clubId === live.current.clubId && token.userId === live.current.userId
   const refreshPlan = useRef(plan.refresh)
   refreshPlan.current = plan.refresh
   useEffect(() => {
@@ -129,11 +159,28 @@ export function ClubPlanScreen() {
     return () => subscription.remove()
   }, [back, busy, selector, step.name])
 
-  const fail = (error: unknown, title: string) => {
+  const fail = async (error: unknown, title: string, operation: BillingOperation, token: ReturnType<typeof capture>) => {
+    if (!active(token)) return
     if (error instanceof ApiError && error.status === 401) return
-    if (error instanceof ApiError && resumeAlreadyActive(error.status)) {
-      setStep({ name: 'message', title: 'Renovación', body: 'La reanudación ya no está pendiente. Actualizamos el estado, sin iniciar otro pago.' })
+    const conflict = error instanceof ApiError ? conflictOutcome(operation, error.status) : null
+    if (conflict === 'reread-resume') {
+      try {
+        const next = await plan.reload()
+        if (!active(token)) return
+        if (resumeConfirmation(next.subscription) === 'resumed') {
+          setStep({ name: 'message', title: 'Renovación reanudada', body: 'La consulta confirma que la renovación ya no está pendiente. No se inició otro pago.' })
+        } else {
+          setStep({ name: 'error', title: 'Renovación', body: 'No pudimos confirmar si la renovación quedó activa. Podés consultar de nuevo. No se repitió el envío.' })
+        }
+      } catch {
+        if (!active(token)) return
+        setStep({ name: 'error', title: 'Renovación', body: 'No pudimos volver a leer la renovación. No se repitió el envío.' })
+      }
+      return
+    }
+    if (conflict === 'recoverable') {
       void plan.reload()
+      setStep({ name: 'error', title, body: 'La operación no se pudo completar. Actualizamos la consulta y no la repetimos.' })
       return
     }
     const kind = planFailure(error)
@@ -144,56 +191,71 @@ export function ClubPlanScreen() {
     setStep({ name: 'error', title, body: failureCopy(kind) })
   }
 
-  const openPayment = useCallback(async (url: string) => {
-    if (!isSafePaymentUrl(url)) {
-      setStep({ name: 'error', title: 'No pudimos abrir el pago', body: 'El destino no es un enlace seguro. No se abrió el navegador.' })
+  const openPayment = async (url: string, token: ReturnType<typeof capture>) => {
+    if (!active(token) || !sameServerUrl(authorizedUrl.current, url)) {
+      setStep({ name: 'error', title: 'No pudimos abrir el pago', body: 'El destino no es el enlace devuelto para este club. No se abrió el navegador.' })
       return
     }
     setAwaitingReturn(true)
     setStep({ name: 'closed' })
     try { await Linking.openURL(url) } catch {
+      if (!active(token)) return
       setStep({ name: 'error', title: 'No pudimos abrir el navegador', body: 'Podés reintentar desde esta pantalla. Cerrar este aviso no cancela un cobro.' })
     }
-  }, [])
+  }
 
-  const followLink = useCallback(async (link: CheckoutLink, consentedTerms: MaterialTerms | null) => {
-    if (!user?.userId || destination?.kind !== 'club') return
-    if (link.clubId !== destination.clubId) {
-      setStep({ name: 'error', title: 'Pago', body: 'La respuesta no corresponde a este club.' })
-      return
-    }
-    await plan.rememberCharge(link.reference)
-    pendingLink.current = link
-    if (!consentedTerms) {
-      await openPayment(link.url)
-      return
-    }
+  const applyOpen = async (link: CheckoutLink, shown: MaterialTerms, token: ReturnType<typeof capture>) => {
+    if (!active(token) || live.current.clubId !== link.clubId) return
     let charge = null
+    let readFailed = false
     try {
-      charge = await planApi.charge(destination.clubId, link.reference)
-    } catch (error) {
-      fail(error, 'Pago')
+      charge = await planApi.charge(link.clubId, link.reference)
+    } catch {
+      readFailed = true
+    }
+    if (!active(token) || live.current.clubId !== link.clubId) return
+    const decision = decideOpen({ clubId: link.clubId, link, charge, readFailed, shown, nowMs: Date.now() })
+    if (decision.kind === 'open') {
+      await openPayment(link.url, token)
       return
     }
-    if (charge.confirmed) {
+    if (decision.kind === 'mismatch' && charge) {
+      const next = chargeMaterial(charge)
+      consented.current = next
+      pendingLink.current = link
+      setStep({ name: 'terms', terms: next })
+      return
+    }
+    if (decision.kind === 'applied') {
       await plan.reload()
+      if (!active(token)) return
       setAwaitingReturn(false)
       setStep({ name: 'message', title: 'Pago confirmado', body: 'El cobro ya está confirmado. No se abrió otro pago.' })
       return
     }
-    if (charge.manualResolution || charge.status === 'FAILED' || charge.status === 'CANCELED') {
-      const banner = chargeBanner(charge)
-      setStep({ name: 'message', title: banner?.title ?? 'Cobro', body: banner?.body ?? 'Consultá el estado en el panel. No se abrió otro pago.' })
+    if (decision.kind === 'expired') {
+      setStep({ name: 'message', title: 'La vigencia terminó', body: decision.requote ? 'La cotización venció. Pedí una cotización nueva para ver las condiciones actuales. No se abrió el enlace vencido.' : 'El enlace ya no está vigente. No se abrió ni se inició otro cobro.' })
       return
     }
-    const next = chargeMaterial(charge)
-    if (materialChanged(consentedTerms, next)) {
-      consented.current = next
-      setStep({ name: 'terms', terms: next })
+    if (decision.kind === 'unavailable') {
+      setStep({ name: 'error', title: 'Pago', body: 'No pudimos leer las condiciones del cobro. No se abrió el navegador.' })
       return
     }
-    await openPayment(link.url)
-  }, [destination, openPayment, plan, user?.userId])
+    const banner = charge ? chargeBanner(charge) : null
+    setStep({ name: 'message', title: banner?.title ?? 'Cobro', body: banner?.body ?? 'Consultá el estado en el panel. No se abrió otro pago.' })
+  }
+
+  const followLink = async (link: CheckoutLink, shown: MaterialTerms, token: ReturnType<typeof capture>) => {
+    if (!active(token) || live.current.clubId !== link.clubId || !live.current.userId) {
+      setStep({ name: 'error', title: 'Pago', body: 'La respuesta no corresponde a este club.' })
+      return
+    }
+    authorizedUrl.current = link.url
+    pendingLink.current = link
+    await plan.rememberCharge(link.reference)
+    if (!active(token)) return
+    await applyOpen(link, shown, token)
+  }
 
   const guarded = async (operation: () => Promise<void>) => {
     if (actionLock.current) return
@@ -202,103 +264,138 @@ export function ClubPlanScreen() {
     try { await operation() } finally { actionLock.current = false; setBusy(false) }
   }
 
-  const startChoice = async () => {
-    if (!plan.subscription || !canManage) return
+  const startChoice = () => void guarded(async () => {
+    const token = capture()
+    if (!plan.subscription || !canManage || !live.current.clubId) return
     setStep({ name: 'loading', title: 'Planes' })
     try {
       const offers = await planApi.plans()
+      if (!active(token)) return
       setStep({ name: 'choose', choices: upgradeChoices(plan.subscription, offers), offers })
-    } catch (error) { fail(error, 'Planes') }
+    } catch (error) { await fail(error, 'Planes', 'plans', token) }
+  })
+
+  const quoteStart = async (token: ReturnType<typeof capture>) => {
+    if (!live.current.clubId) return
+    setStep({ name: 'loading', title: 'Ajuste a ELITE' })
+    try {
+      const quote = await planApi.quote(live.current.clubId)
+      if (!active(token)) return
+      if (!quote.available) {
+        setStep({ name: 'message', title: 'Ajuste a ELITE', body: 'Ahora no hay una cotización disponible. Podés volver a pedirla.' })
+        return
+      }
+      consented.current = quoteMaterial(quote)
+      setStep({ name: 'quote', quote })
+    } catch (error) { await fail(error, 'Ajuste a ELITE', 'quote', token) }
   }
 
   const pick = (choice: UpgradeChoice) => {
+    const token = capture()
     if (choice.kind === 'checkout') {
+      if (!choice.amount || !choice.currency) return
       consented.current = catalogMaterial(choice.planCode, choice.amount, choice.currency)
       setStep({ name: 'confirm-checkout', choice })
       return
     }
-    void guarded(async () => {
-      if (destination?.kind !== 'club') return
-      setStep({ name: 'loading', title: 'Ajuste a ELITE' })
-      try {
-        const quote = await planApi.quote(destination.clubId)
-        if (!quote.available) {
-          setStep({ name: 'message', title: 'Ajuste a ELITE', body: 'Ahora no hay una cotización disponible. Podés volver a pedirla.' })
-          return
-        }
-        consented.current = quoteMaterial(quote)
-        setStep({ name: 'quote', quote })
-      } catch (error) { fail(error, 'Ajuste a ELITE') }
-    })
+    void guarded(() => quoteStart(token))
   }
 
   const confirmCheckout = () => void guarded(async () => {
-    if (destination?.kind !== 'club' || step.name !== 'confirm-checkout') return
+    const token = capture()
+    if (!live.current.clubId || step.name !== 'confirm-checkout' || !consented.current) return
+    const shown = consented.current
     try {
-      const link = await planApi.checkout(destination.clubId, step.choice.planCode)
-      await followLink(link, consented.current)
-    } catch (error) { fail(error, 'Abrir pago') }
+      const link = await planApi.checkout(live.current.clubId, step.choice.planCode)
+      if (!active(token)) return
+      await followLink(link, shown, token)
+    } catch (error) { await fail(error, 'Abrir pago', 'checkout', token) }
   })
 
   const confirmQuote = (quote: AdjustmentQuote) => void guarded(async () => {
-    if (destination?.kind !== 'club') return
+    const token = capture()
+    if (!live.current.clubId) return
     try {
-      const link = await planApi.adjustmentCheckout(destination.clubId)
-      await followLink(link, quoteMaterial(quote))
-    } catch (error) { fail(error, 'Ajuste a ELITE') }
+      const link = await planApi.adjustmentCheckout(live.current.clubId)
+      if (!active(token)) return
+      await followLink(link, quoteMaterial(quote), token)
+    } catch (error) { await fail(error, 'Ajuste a ELITE', 'quote', token) }
   })
 
   const confirmTerms = () => void guarded(async () => {
+    const token = capture()
     const link = pendingLink.current
-    if (!link) return
-    await openPayment(link.url)
+    const shown = consented.current
+    if (!link || !shown) return
+    await applyOpen(link, shown, token)
   })
 
-  const complete = () => {
-    const requested = plan.subscription?.requestedPlan
-    if (!requested || !canManage) return
-    if (completeUsesAdjustment(plan.subscription)) {
-      pick({ kind: 'adjustment', planCode: 'ELITE', name: 'ELITE' })
+  const complete = () => void guarded(async () => {
+    const token = capture()
+    if (!plan.subscription || !canManage) return
+    if (completeChoice(plan.subscription, []).kind === 'adjustment') {
+      await quoteStart(token)
       return
     }
-    if (requested.planCode !== 'PRO' && requested.planCode !== 'ELITE') return
-    consented.current = catalogMaterial(requested.planCode, null, null)
-    setStep({ name: 'confirm-checkout', choice: { kind: 'checkout', planCode: requested.planCode, name: requested.planCode, amount: null, currency: null } })
-  }
+    try {
+      const offers = await planApi.plans()
+      if (!active(token) || !plan.subscription) return
+      const choice = completeChoice(plan.subscription, offers)
+      if (choice.kind === 'adjustment') {
+        await quoteStart(token)
+        return
+      }
+      if (choice.kind === 'unavailable') {
+        setStep({ name: 'message', title: 'Completar pago', body: 'Este plan no tiene un precio mensual publicado. No se abre el pago.' })
+        return
+      }
+      consented.current = catalogMaterial(choice.choice.planCode, choice.choice.amount, choice.choice.currency)
+      setStep({ name: 'confirm-checkout', choice: choice.choice })
+    } catch (error) { await fail(error, 'Completar pago', 'plans', token) }
+  })
 
   const startResume = () => void guarded(async () => {
-    if (destination?.kind !== 'club') return
+    const token = capture()
+    if (!live.current.clubId) return
     setStep({ name: 'loading', title: 'Reanudar renovación' })
     try {
-      setStep({ name: 'resume', preview: await planApi.resumePreview(destination.clubId) })
-    } catch (error) { fail(error, 'Reanudar renovación') }
+      const preview = await planApi.resumePreview(live.current.clubId)
+      if (!active(token)) return
+      setStep({ name: 'resume', preview })
+    } catch (error) { await fail(error, 'Reanudar renovación', 'resume', token) }
   })
 
   const confirmResume = () => void guarded(async () => {
-    if (destination?.kind !== 'club' || step.name !== 'resume') return
+    const token = capture()
+    if (!live.current.clubId || step.name !== 'resume') return
     try {
-      const preview = await planApi.confirmResume(destination.clubId)
-      await plan.reload()
-      if (preview.resumed && !preview.payerAuthorizationUrl) {
-        setStep({ name: 'message', title: 'Renovación reanudada', body: 'La respuesta confirma la misma recurrencia. Esta acción no cobra de nuevo el período vigente.' })
+      const preview = await planApi.confirmResume(live.current.clubId)
+      if (!active(token)) return
+      const next = await plan.reload()
+      if (!active(token)) return
+      if (preview.resumed && !preview.payerAuthorizationUrl && resumeConfirmation(next.subscription) === 'resumed') {
+        setStep({ name: 'message', title: 'Renovación reanudada', body: 'La consulta confirma la misma recurrencia. Esta acción no cobra de nuevo el período vigente.' })
         return
       }
       if (preview.payerAuthorizationUrl) {
+        authorizedUrl.current = preview.payerAuthorizationUrl
         setStep({ name: 'message', title: 'Falta autorizar la renovación', body: 'Abrir el enlace no confirma el pago. Cuando vuelvas, consultá de nuevo el estado.' })
-        if (isSafePaymentUrl(preview.payerAuthorizationUrl)) await openPayment(preview.payerAuthorizationUrl)
+        await openPayment(preview.payerAuthorizationUrl, token)
         return
       }
       setStep({ name: 'message', title: 'Renovación', body: preview.message ?? 'Consultá de nuevo el estado. Esta acción no inició otro pago.' })
-    } catch (error) { fail(error, 'Reanudar renovación') }
+    } catch (error) { await fail(error, 'Reanudar renovación', 'resume', token) }
   })
 
   const authorize = () => void guarded(async () => {
+    const token = capture()
     const url = plan.subscription?.recurrenceAuthorizationUrl
     if (!url) {
       setStep({ name: 'error', title: 'Autorizar renovación', body: 'No hay un enlace de autorización para abrir. Consultá de nuevo el estado.' })
       return
     }
-    await openPayment(url)
+    authorizedUrl.current = url
+    await openPayment(url, token)
   })
 
   if (phase === 'checking' && !plan.subscription && !plan.usage) {
