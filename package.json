@@ -17,7 +17,8 @@
     "test:startup": "node scripts/test-startup.cjs",
     "smoke:http": "node scripts/test-http.cjs --smoke",
     "test:recovery": "node scripts/test-recovery.cjs",
-    "test:location": "node scripts/test-registration-location.cjs"
+    "test:location": "node scripts/test-registration-location.cjs",
+    "test:plan": "node scripts/test-plan.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
