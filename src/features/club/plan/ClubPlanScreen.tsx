@@ -18,6 +18,7 @@ import { venueIcons } from '../venues/venue-icons'
 import { planApi, planFailure } from './plan-api'
 import { PlanJourney, type PlanStep } from './PlanJourney'
 import { useClubPlan } from './use-club-plan'
+import { resumeRead, visibleEventUsage } from './plan-load'
 import {
   capabilityLines,
   catalogMaterial,
@@ -33,7 +34,6 @@ import {
   planHeadline,
   primaryAction,
   quoteMaterial,
-  resumeConfirmation,
   sameServerUrl,
   upgradeChoices,
   usageBanners,
@@ -167,7 +167,7 @@ export function ClubPlanScreen() {
       try {
         const next = await plan.reload()
         if (!active(token)) return
-        if (resumeConfirmation(next.subscription) === 'resumed') {
+        if (resumeRead(next) === 'resumed') {
           setStep({ name: 'message', title: 'Renovación reanudada', body: 'La consulta confirma que la renovación ya no está pendiente. No se inició otro pago.' })
         } else {
           setStep({ name: 'error', title: 'Renovación', body: 'No pudimos confirmar si la renovación quedó activa. Podés consultar de nuevo. No se repitió el envío.' })
@@ -373,7 +373,7 @@ export function ClubPlanScreen() {
       if (!active(token)) return
       const next = await plan.reload()
       if (!active(token)) return
-      if (preview.resumed && !preview.payerAuthorizationUrl && resumeConfirmation(next.subscription) === 'resumed') {
+      if (preview.resumed && !preview.payerAuthorizationUrl && resumeRead(next) === 'resumed') {
         setStep({ name: 'message', title: 'Renovación reanudada', body: 'La consulta confirma la misma recurrencia. Esta acción no cobra de nuevo el período vigente.' })
         return
       }
@@ -464,11 +464,18 @@ export function ClubPlanScreen() {
               <SearchFieldIcon size={24} color="#605E64" />
               <Text className="font-inter-500" style={{ fontSize: 14, lineHeight: 20, color: '#605e64' }}>{selectedName ?? 'Elegir torneo'}</Text>
             </Pressable> : null}
-            {plan.usage.event ? <>
-              <Meter meter={{ ...plan.usage.event.confirmedEntries, key: 'confirmedEntries' }} />
-              <Meter meter={{ ...plan.usage.event.divisions, key: 'divisions' }} />
-              <Text className="font-sans" style={{ fontSize: 12, lineHeight: 16, color: '#605e64' }}>La lista de espera no consume el límite de parejas del plan. El cupo de cada división se consulta en sus inscripciones.</Text>
-            </> : null}
+            {(() => {
+              const eventUsage = visibleEventUsage(plan)
+              return <>
+                {plan.eventPending ? <Text className="font-sans" style={{ fontSize: 12, lineHeight: 16, color: '#605e64' }}>Cargando el uso del torneo...</Text> : null}
+                {eventUsage ? <>
+                  <Meter meter={{ ...eventUsage.confirmedEntries, key: 'confirmedEntries' }} />
+                  <Meter meter={{ ...eventUsage.divisions, key: 'divisions' }} />
+                  <Text className="font-sans" style={{ fontSize: 12, lineHeight: 16, color: '#605e64' }}>La lista de espera no consume el límite de parejas del plan. El cupo de cada división se consulta en sus inscripciones.</Text>
+                </> : null}
+                {plan.usageError && plan.eventId && !plan.eventPending && !eventUsage ? <><Banner tone="error" title="No pudimos cargar el torneo" body="Reintentá la consulta de este torneo. No mostramos el uso de otro." /><Button onPress={() => void plan.selectEvent(plan.eventId as string)} style={{ height: 48, borderRadius: 8 }}>Reintentar torneo</Button></> : null}
+              </>
+            })()}
           </> : null}
           {capabilities.length > 0 && plan.usage ? <View style={{ gap: 8 }}>
             <Text className="font-inter-600" style={{ fontSize: 18, lineHeight: 24, color: '#120f18' }}>Incluido en {plan.usage.planCode}</Text>

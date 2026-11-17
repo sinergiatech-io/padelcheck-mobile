@@ -1,7 +1,7 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const plan = require(process.env.PLAN_TEST_MODULE)
-const { createPlanReads } = require(process.env.PLAN_LOAD_TEST_MODULE)
+const { createPlanReads, visibleEventUsage, resumeRead } = require(process.env.PLAN_LOAD_TEST_MODULE)
 
 const eventId = '11111111-1111-1111-1111-111111111111'
 const reference = 'pcabcdef1234567890'
@@ -315,5 +315,59 @@ test('the same context joins one refresh and a revoked context clears it', async
   session.reset()
   assert.equal(session.snapshot().subscription, null)
   assert.equal(session.snapshot().loading, false)
+})
+
+function eventUsage(clubId, eventId, pairs) {
+  return {
+    ...usageBody(clubId),
+    event: {
+      eventId,
+      status: 'DRAFT',
+      confirmedEntries: { key: 'confirmedEntries', state: 'LIMITED', limit: 24, used: pairs, warning: false, reached: false, exceeded: false },
+      divisions: { key: 'divisions', state: 'LIMITED', limit: 2, used: 1, warning: false, reached: false, exceeded: false },
+    },
+  }
+}
+
+test('changing tournament hides the previous event until its own usage arrives', async () => {
+  const eventA = '11111111-1111-1111-1111-111111111111'
+  const eventB = '22222222-2222-2222-2222-222222222222'
+  const second = deferred()
+  let failNext = false
+  const client = {
+    loadAttempt: async () => null,
+    saveAttempt: async () => {},
+    events: async () => [{ id: eventA, name: 'Copa A' }, { id: eventB, name: 'Copa B' }],
+    charge: async () => { throw Object.assign(new Error('missing'), { status: 404 }) },
+    subscription: async () => {
+      if (failNext) throw Object.assign(new Error('down'), { kind: 'network' })
+      return { ...subscriptionBody('club-a'), recurrencePaused: false, recurrenceResumeAction: null }
+    },
+    usage: async (clubId, eventId) => eventId === eventB ? second.promise : eventUsage(clubId, eventA, 10),
+  }
+  const session = createPlanReads(client)
+  const context = { clubId: 'club-a', userId: 'user', listEvents: true, enabled: true }
+  await session.refresh(context)
+  assert.equal(visibleEventUsage(session.snapshot()).confirmedEntries.used, 10)
+  assert.equal(resumeRead(session.snapshot()), 'resumed')
+  const pending = session.selectEvent(context, eventB)
+  await Promise.resolve()
+  assert.equal(session.snapshot().eventId, eventB)
+  assert.equal(visibleEventUsage(session.snapshot()), null)
+  assert.equal(session.snapshot().usage.club.activeTournaments.used, 0)
+  second.resolve(eventUsage('club-a', eventB, 30))
+  await pending
+  assert.equal(visibleEventUsage(session.snapshot()).confirmedEntries.used, 30)
+  client.usage = async () => { throw Object.assign(new Error('down'), { kind: 'network' }) }
+  await session.selectEvent(context, eventA)
+  assert.equal(session.snapshot().eventId, eventA)
+  assert.equal(visibleEventUsage(session.snapshot()), null)
+  assert.equal(session.snapshot().usageError, 'network')
+  assert.equal(session.snapshot().usage.club.staffUsers.used, 0)
+  failNext = true
+  await session.refresh(context)
+  assert.equal(session.snapshot().fresh, false)
+  assert.equal(resumeRead(session.snapshot()), 'unknown')
+  assert.equal(session.snapshot().subscription.recurrencePaused, false)
 })
 

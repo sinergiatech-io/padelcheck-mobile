@@ -1,6 +1,7 @@
 import {
   isChargeReference,
   nextEventSelection,
+  resumeConfirmation,
   type BillingCharge,
   type ClubEventOption,
   type ClubSubscription,
@@ -21,6 +22,10 @@ export interface PlanSnapshot {
   error: 'timeout' | 'network' | 'invalid' | 'not-found' | null
   usageError: 'timeout' | 'network' | 'invalid' | 'not-found' | null
   eventsError: boolean
+  /** True only when the latest subscription read completed for this context. */
+  fresh: boolean
+  /** True while the selected event usage has not arrived. Club meters stay visible. */
+  eventPending: boolean
   subscription: ClubSubscription | null
   usage: ClubUsage | null
   events: ClubEventOption[]
@@ -55,6 +60,8 @@ function blank(): PlanSnapshot {
     error: null,
     usageError: null,
     eventsError: false,
+    fresh: false,
+    eventPending: false,
     subscription: null,
     usage: null,
     events: [],
@@ -83,6 +90,20 @@ function usageMissing(error: unknown): boolean {
 function panelError(kind: ReturnType<typeof failureKind>): PlanSnapshot['error'] {
   if (kind === 'timeout' || kind === 'network' || kind === 'not-found') return kind
   return 'invalid'
+}
+
+/** Event meters the screen may show. A pending or mismatched event is hidden, not zeroed. */
+export function visibleEventUsage(snapshot: Pick<PlanSnapshot, 'eventId' | 'usage' | 'eventPending'>) {
+  if (snapshot.eventPending) return null
+  const event = snapshot.usage?.event ?? null
+  if (!event || event.eventId !== snapshot.eventId) return null
+  return event
+}
+
+/** A kept snapshot is not a fresh renewal confirmation. */
+export function resumeRead(snapshot: Pick<PlanSnapshot, 'fresh' | 'error' | 'usageError' | 'forbidden' | 'subscription'>): 'resumed' | 'pending' | 'unknown' {
+  if (!snapshot.fresh || snapshot.error || snapshot.usageError || snapshot.forbidden) return 'unknown'
+  return resumeConfirmation(snapshot.subscription)
 }
 
 export function createPlanReads(client: PlanReadClient): PlanReads {
@@ -179,6 +200,8 @@ export function createPlanReads(client: PlanReadClient): PlanReads {
         error: null,
         usageError: null,
         eventsError,
+        fresh: true,
+        eventPending: false,
         subscription,
         usage,
         events: nextEvents,
@@ -189,17 +212,17 @@ export function createPlanReads(client: PlanReadClient): PlanReads {
       if (!live()) return snapshot
       const kind = failureKind(failure)
       if (kind === 'unauthorized') {
-        publish({ ...snapshot, loading: false, refreshing: false })
+        publish({ ...snapshot, loading: false, refreshing: false, fresh: false })
         return snapshot
       }
       if (kind === 'forbidden') {
-        publish({ ...snapshot, loading: false, refreshing: false, forbidden: true, error: null })
+        publish({ ...snapshot, loading: false, refreshing: false, forbidden: true, error: null, fresh: false })
         return snapshot
       }
       const problem = panelError(kind)
       publish(keep
-        ? { ...snapshot, loading: false, refreshing: false, usageError: problem }
-        : { ...snapshot, loading: false, refreshing: false, error: problem })
+        ? { ...snapshot, loading: false, refreshing: false, usageError: problem, fresh: false }
+        : { ...snapshot, loading: false, refreshing: false, error: problem, fresh: false })
     }
     return snapshot
   }
@@ -218,19 +241,24 @@ export function createPlanReads(client: PlanReadClient): PlanReads {
   async function selectEvent(context: PlanReadContext, next: string): Promise<PlanSnapshot> {
     if (!context.enabled || !context.clubId) return snapshot
     eventId = next
-    publish({ ...snapshot, eventId: next, loading: false, refreshing: false, usageError: null })
+    const clubUsage = snapshot.usage ? { ...snapshot.usage, event: null } : snapshot.usage
+    publish({ ...snapshot, eventId: next, usage: clubUsage, loading: false, refreshing: false, usageError: null, eventPending: true })
     const startedEpoch = epoch
     const startedRequest = ++request
     try {
       const usage = await client.usage(context.clubId, next)
       if (startedEpoch !== epoch || startedRequest !== request || eventId !== next) return snapshot
       hasData = true
-      publish({ ...snapshot, usage, usageError: null })
+      const event = usage.event?.eventId === next ? usage.event : null
+      publish({ ...snapshot, usage: { ...usage, event }, usageError: null, eventPending: false })
     } catch (failure) {
-      if (startedEpoch !== epoch || startedRequest !== request) return snapshot
+      if (startedEpoch !== epoch || startedRequest !== request || eventId !== next) return snapshot
       const kind = failureKind(failure)
-      if (kind === 'unauthorized' || kind === 'forbidden') return snapshot
-      publish({ ...snapshot, usageError: panelError(kind) })
+      if (kind === 'unauthorized' || kind === 'forbidden') {
+        publish({ ...snapshot, eventPending: false, fresh: false, forbidden: kind === 'forbidden' })
+        return snapshot
+      }
+      publish({ ...snapshot, usage: clubUsage, usageError: panelError(kind), eventPending: false })
     }
     return snapshot
   }
