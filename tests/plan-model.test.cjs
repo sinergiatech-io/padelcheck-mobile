@@ -12,6 +12,7 @@ test('checkout return opens the plan without carrying provider results or a club
   assert.equal(redirectPaymentReturn(web), '/club/plan?paymentReturn=1')
   assert.equal(redirectPaymentReturn('padelcheck://billing/return?payment_id=123'), '/club/plan?paymentReturn=2')
   assert.equal(redirectPaymentReturn('/billing/return?status=pending'), '/club/plan?paymentReturn=3')
+  assert.equal(redirectPaymentReturn('padelcheck:///billing/return?status=approved'), '/club/plan?paymentReturn=4')
   assert.equal(redirectPaymentReturn('https://other.example/billing/return'), 'https://other.example/billing/return')
   assert.equal(redirectPaymentReturn('//other.example/billing/return'), '//other.example/billing/return')
   assert.equal(redirectPaymentReturn('/reset-password?token=example'), '/reset-password?token=example')
