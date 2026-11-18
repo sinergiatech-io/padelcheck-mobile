@@ -44,6 +44,16 @@ test('a single club with UNKNOWN or INACTIVE enters the club shell', () => {
   assert.equal(guardRedirect('native', { kind: 'club', clubId: 'c1' }, '/events'), '/dashboard')
 })
 
+test('a native payment return resumes the plan after sign-in only for club activity', () => {
+  const clubDestination = { kind: 'club', clubId: 'c1' }
+  assert.equal(acceptedReturnPath('native', clubDestination, '/club/plan'), '/club/plan')
+  assert.equal(acceptedReturnPath('native', clubDestination, '//example.test/club/plan'), '/dashboard')
+  assert.equal(acceptedReturnPath('native', clubDestination, '/club/plan/other'), '/dashboard')
+  assert.equal(acceptedReturnPath('native', { kind: 'player' }, '/club/plan'), '/events')
+  const unavailable = { kind: 'continue', reason: 'unavailable' }
+  assert.equal(acceptedReturnPath('native', unavailable, '/club/plan'), '/auth-continue')
+})
+
 test('PENDING club setup is not the same message path as several activities or an empty context', () => {
   assert.equal(resolveAccessDestination([club('PENDING')]).reason, 'pending-setup')
   assert.equal(
