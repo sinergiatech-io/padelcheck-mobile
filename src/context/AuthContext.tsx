@@ -17,6 +17,7 @@ import { decideSessionCheck } from '@/features/auth/session-check'
 import { bumpSessionGeneration, currentSessionGeneration } from '@/features/auth/session-generation'
 import { ApiError } from '@/lib/api-client'
 import { clearStoredToken, getStoredToken, setStoredToken } from '@/lib/auth'
+import { clearBillingAttempt } from '@/features/club/plan/billing-attempt'
 import { setHttpErrorListener } from '@/lib/http-client'
 import { queryClient } from '@/lib/query-client'
 import { StorageUnavailableError, withStorageDeadline } from '@/lib/storage-deadline'
@@ -58,6 +59,7 @@ async function clearPrivateSession() {
   queryClient.clear()
   const results = await Promise.allSettled([
     clearStoredToken(),
+    clearBillingAttempt(),
     withStorageDeadline(() => SecureStore.deleteItemAsync(USER_KEY)),
     withStorageDeadline(() => SecureStore.deleteItemAsync(EXPIRES_KEY)),
   ])

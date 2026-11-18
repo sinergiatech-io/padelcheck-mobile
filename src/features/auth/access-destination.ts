@@ -152,5 +152,6 @@ export function guardRedirect(
     || path === '/club/settings/info' || path === '/club/settings/info/preview'
     || path === '/club/settings/tournaments'
     || path === '/club/settings/venues' || path.startsWith('/club/settings/venues/')
+    || path === '/club/plan' || path.startsWith('/club/plan/')
   return path === clubRoot || clubSettings || platform === 'native' && path === '/club' ? null : clubRoot
 }

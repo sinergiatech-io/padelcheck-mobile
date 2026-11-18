@@ -51,7 +51,14 @@ function Shell({ title, back, children, busy = false }: { title: string; back?: 
 function useClubAccess() {
   const { user, destination, phase } = useAuth()
   const context = destination?.kind === 'club' ? user?.accessContexts?.find(c => c.activity === 'CLUB' && c.clubId === destination.clubId) : null
-  return { phase, destination, allowed: phase === 'ready' && Boolean(context?.permissions?.includes('MANAGE_CLUB_SETTINGS')), clubId: context?.clubId ?? null }
+  const permissions = context?.permissions ?? []
+  return {
+    phase,
+    destination,
+    allowed: phase === 'ready' && permissions.includes('MANAGE_CLUB_SETTINGS'),
+    canViewBilling: phase === 'ready' && permissions.includes('VIEW_BILLING'),
+    clubId: context?.clubId ?? null,
+  }
 }
 function Gate({ children }: { children: ReactNode }) {
   const { phase, destination } = useClubAccess()
@@ -62,9 +69,13 @@ function Gate({ children }: { children: ReactNode }) {
   return children
 }
 export function MyClubScreen() {
-  const { allowed } = useClubAccess()
+  const { allowed, canViewBilling } = useClubAccess()
+  const links = [
+    ...(allowed ? [['Información del club', `${HOME}/info`], ['Configuración de torneos', `${HOME}/tournaments`], ['Sedes y canchas', BASE], ['Reglas de categorías', `${HOME}/categories`]] : []),
+    ...(canViewBilling ? [['Plan del club', '/club/plan']] : []),
+  ]
   return <Gate><Shell title="Mi Club"><ScrollView contentContainerStyle={{ padding: 16, paddingTop: 24, gap: 32 }}><Text className="font-sans" style={{ fontSize: 16, lineHeight: 24, color: '#605e64' }}>Gestioná la información y configuración de tu club</Text>
-    {allowed ? <View style={{ gap: 12 }}>{[['Información del club', `${HOME}/info`], ['Configuración de torneos', `${HOME}/tournaments`], ['Sedes y canchas', BASE], ['Reglas de categorías', `${HOME}/categories`]].map(([label, path]) => <Pressable key={path} accessibilityRole="button" onPress={() => router.push(path as Href)} style={[s.row, { gap: 20, minHeight: 56 }]}><Text className="font-sans" style={[s.label, { flex: 1, borderBottomWidth: 1, borderBottomColor: '#dedde0', paddingVertical: 16 }]}>{label}</Text><Icon name="arrow" /></Pressable>)}</View> : <Notice error>No tenés permiso para gestionar la configuración de este club.</Notice>}
+    {links.length > 0 ? <View style={{ gap: 12 }}>{links.map(([label, path]) => <Pressable key={path} accessibilityRole="button" onPress={() => router.push(path as Href)} style={[s.row, { gap: 20, minHeight: 56 }]}><Text className="font-sans" style={[s.label, { flex: 1, borderBottomWidth: 1, borderBottomColor: '#dedde0', paddingVertical: 16 }]}>{label}</Text><Icon name="arrow" /></Pressable>)}</View> : <Notice error>No tenés permiso para gestionar la configuración de este club.</Notice>}
   </ScrollView></Shell></Gate>
 }
 export function ClubVenuesScreen() {
