@@ -78,6 +78,7 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets()
   const { login, phase, destination } = useAuth()
   const params = useLocalSearchParams<{ returnUrl?: string; notice?: string }>()
+  const returnUrl = typeof params.returnUrl === 'string' ? params.returnUrl : null
   const [showPassword, setShowPassword] = useState(false)
   const [formError, setFormError] = useState<LoginNotice | null>(() =>
     consumeLoginNotice() === 'expired' || params.notice === 'expired'
@@ -105,7 +106,6 @@ export default function LoginScreen() {
       const accepted = await login(data.accessToken, data.context, data.expiresIn)
       if (!accepted) return
       const resolved = resolveAccessDestination(data.context.accessContexts)
-      const returnUrl = typeof params.returnUrl === 'string' ? params.returnUrl : null
       router.replace(acceptedReturnPath('native', resolved, returnUrl))
     } catch (error) {
       setFormError(loginErrorMessage(error))
@@ -124,7 +124,7 @@ export default function LoginScreen() {
   }
   if (phase === 'unverified') return <SessionUnverified />
   if (phase === 'ready' && destination) {
-    return <Redirect href={acceptedReturnPath('native', destination, null)} />
+    return <Redirect href={acceptedReturnPath('native', destination, returnUrl)} />
   }
 
   const paleSubmit = submitting || formError?.code === 'AUTH_ACCOUNT_BLOCKED'

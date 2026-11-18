@@ -97,7 +97,7 @@ export function safeInternalPath(value: string | null | undefined): string | nul
   return path
 }
 
-/** E1 only accepts the authorized root, never a descendant or the other activity. */
+/** Accept only the destinations that explicitly support returning after sign-in. */
 export function acceptedReturnPath(
   platform: AccessPlatform,
   destination: AccessDestination,
@@ -109,7 +109,7 @@ export function acceptedReturnPath(
   if (platform === 'web' && destination.kind === 'player' && path === WEB_PLAYER_ROOT) return path
   if (platform === 'web' && destination.kind === 'club' && path === WEB_CLUB_ROOT) return path
   if (platform === 'native' && destination.kind === 'player' && path === NATIVE_PLAYER_ROOT) return path
-  if (platform === 'native' && destination.kind === 'club' && path === NATIVE_CLUB_ROOT) return path
+  if (platform === 'native' && destination.kind === 'club' && (path === NATIVE_CLUB_ROOT || path === '/club/plan')) return path
   return fallback
 }
 
