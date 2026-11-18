@@ -54,6 +54,7 @@ export interface ClubSubscription {
   planCode: string
   status: string
   periodEnd: string | null
+  recurrenceStatus: string | null
   recurrencePaused: boolean | null
   recurrenceMessage: string | null
   recurrenceResumeAction: 'RESUME_RENEWAL' | 'AUTHORIZE_RENEWAL' | null
@@ -194,6 +195,13 @@ export function isChargeReference(value: string | null | undefined): value is st
   return typeof value === 'string' && CHARGE_REFERENCE.test(value)
 }
 
+const METER_KEY: Record<string, string> = {
+  MAX_ACTIVE_TOURNAMENTS: 'activeTournaments',
+  MAX_STAFF_USERS: 'staffUsers',
+  MAX_ENTRIES_PER_EVENT: 'confirmedEntries',
+  MAX_DIVISIONS_PER_EVENT: 'divisions',
+}
+
 function meter(value: unknown): UsageMeter | null {
   const source = record(value)
   if (!source) return null
@@ -211,7 +219,7 @@ function meter(value: unknown): UsageMeter | null {
   if (state !== 'LIMITED' && (source.warning != null || source.reached != null || source.exceeded != null)) return null
   if (state === 'LIMITED' && ['warning', 'reached', 'exceeded'].some(name => source[name] != null && typeof source[name] !== 'boolean')) return null
   return {
-    key: text(source.key) ?? '',
+    key: METER_KEY[text(source.key) ?? ''] ?? text(source.key) ?? '',
     state,
     limit: state === 'LIMITED' ? limit as number : null,
     used: source.used,
@@ -296,6 +304,7 @@ export function parseSubscription(value: unknown): ClubSubscription | null {
     planCode,
     status,
     periodEnd: dateText(source.periodEnd),
+    recurrenceStatus: code(source.recurrenceStatus, STATUS_CODE),
     recurrencePaused: bool(source.recurrencePaused),
     recurrenceMessage: text(source.recurrenceMessage),
     recurrenceResumeAction: resume === 'RESUME_RENEWAL' || resume === 'AUTHORIZE_RENEWAL' ? resume : null,
@@ -804,7 +813,7 @@ export function conflictOutcome(operation: BillingOperation, status: number): 'r
 export function resumeConfirmation(subscription: ClubSubscription | null): 'resumed' | 'pending' | 'unknown' {
   if (!subscription) return 'unknown'
   if (subscription.recurrenceResumeAction || subscription.recurrencePaused === true) return 'pending'
-  if (subscription.recurrencePaused === false) return 'resumed'
+  if (subscription.recurrenceStatus === 'ALIGNED' && subscription.recurrencePaused === false) return 'resumed'
   return 'unknown'
 }
 

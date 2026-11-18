@@ -62,6 +62,23 @@ test('meters keep real zero, warning, limit, excess and unlimited distinct', () 
   assert.equal(plan.meterValue(unlimited), 'Ilimitado')
   assert.equal(plan.meterPercent(unlimited), null)
   assert.equal(plan.meterCaption(unlimited), '4 torneos activos · Sin límite')
+  const rawWarning = plan.parseUsage({
+    clubId: 'c1', planCode: 'FREE', status: 'ACTIVE', subscriptionPlanCode: 'FREE', plan: null,
+    club: {
+      activeTournaments: { key: 'MAX_ACTIVE_TOURNAMENTS', state: 'LIMITED', limit: 5, used: 4, warning: false, reached: false, exceeded: false },
+      staffUsers: { key: 'MAX_STAFF_USERS', state: 'LIMITED', limit: 1, used: 0, warning: false, reached: false, exceeded: false },
+    },
+    event: {
+      eventId, confirmedEntries: { key: 'MAX_ENTRIES_PER_EVENT', state: 'LIMITED', limit: 24, used: 20, warning: true, reached: false, exceeded: false },
+      divisions: { key: 'MAX_DIVISIONS_PER_EVENT', state: 'LIMITED', limit: 2, used: 0, warning: false, reached: false, exceeded: false },
+    },
+  })
+  assert.equal(rawWarning.club.activeTournaments.key, 'activeTournaments')
+  assert.equal(rawWarning.event.confirmedEntries.key, 'confirmedEntries')
+  assert.equal(plan.usageBanners(rawWarning)[0].title, 'Te acercás al límite de parejas')
+  rawWarning.event = null
+  rawWarning.club.activeTournaments.warning = true
+  assert.equal(plan.usageBanners(rawWarning)[0].title, 'Te acercás al límite de torneos activos')
   assert.equal(plan.parseUsage({
     clubId: 'c1', planCode: 'ELITE', status: 'ACTIVE', subscriptionPlanCode: 'ELITE', plan: null,
     club: { activeTournaments: { ...unlimited, key: 'activeTournaments' }, staffUsers: meter({ key: 'staffUsers', state: 'LIMITED', warning: 'no' }) },
@@ -158,7 +175,9 @@ test('a resume conflict is reread, and another 409 is not treated as an active r
   assert.equal(plan.conflictOutcome('checkout', 409), 'recoverable')
   assert.equal(plan.conflictOutcome('quote', 409), 'recoverable')
   assert.equal(plan.conflictOutcome('resume', 500), null)
-  assert.equal(plan.resumeConfirmation(plan.parseSubscription(subscription({ recurrencePaused: false, recurrenceResumeAction: null }))), 'resumed')
+  assert.equal(plan.resumeConfirmation(plan.parseSubscription(subscription({ recurrenceStatus: 'ALIGNED', recurrencePaused: false, recurrenceResumeAction: null }))), 'resumed')
+  assert.equal(plan.resumeConfirmation(plan.parseSubscription(subscription({ recurrenceStatus: 'PENDING', recurrencePaused: false, recurrenceResumeAction: null }))), 'unknown')
+  assert.equal(plan.resumeConfirmation(plan.parseSubscription(subscription({ recurrencePaused: false, recurrenceResumeAction: null }))), 'unknown')
   assert.equal(plan.resumeConfirmation(plan.parseSubscription(subscription({ recurrencePaused: true, recurrenceResumeAction: 'RESUME_RENEWAL' }))), 'pending')
   assert.equal(plan.resumeConfirmation(null), 'unknown')
 })
@@ -341,7 +360,7 @@ test('changing tournament hides the previous event until its own usage arrives',
     charge: async () => { throw Object.assign(new Error('missing'), { status: 404 }) },
     subscription: async () => {
       if (failNext) throw Object.assign(new Error('down'), { kind: 'network' })
-      return { ...subscriptionBody('club-a'), recurrencePaused: false, recurrenceResumeAction: null }
+      return { ...subscriptionBody('club-a'), recurrenceStatus: 'ALIGNED', recurrencePaused: false, recurrenceResumeAction: null }
     },
     usage: async (clubId, eventId) => eventId === eventB ? second.promise : eventUsage(clubId, eventA, 10),
   }
