@@ -106,6 +106,15 @@ export function resumeRead(snapshot: Pick<PlanSnapshot, 'fresh' | 'error' | 'usa
   return resumeConfirmation(snapshot.subscription)
 }
 
+export function paymentCheckResult(snapshot: Pick<PlanSnapshot, 'fresh' | 'forbidden' | 'charge' | 'usage'>): 'activated' | 'pending' | 'plan-mismatch' | 'settled' | 'unavailable' {
+  if (snapshot.forbidden) return 'settled'
+  const charge = snapshot.charge
+  if (!snapshot.fresh || !charge) return 'unavailable'
+  if (charge.manualResolution || charge.status === 'UNAPPLIED' || charge.status === 'FAILED' || charge.status === 'CANCELED') return 'settled'
+  if (!charge.confirmed && charge.status !== 'APPLIED') return 'pending'
+  return charge.planCode && snapshot.usage?.planCode === charge.planCode ? 'activated' : 'plan-mismatch'
+}
+
 export function createPlanReads(client: PlanReadClient): PlanReads {
   let epoch = 0
   let request = 0

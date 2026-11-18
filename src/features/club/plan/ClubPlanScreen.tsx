@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, AppState, BackHandler, Linking, Pressable, Text, View } from 'react-native'
-import { Redirect, router, type Href } from 'expo-router'
+import { Redirect, router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 import Svg, { Path } from 'react-native-svg'
@@ -12,13 +12,15 @@ import { useRefreshControl } from '@/hooks/use-refresh-control'
 import { useAuth } from '@/context/AuthContext'
 import { ApiError } from '@/lib/api-client'
 import { SessionUnverified } from '@/features/auth/SessionUnverified'
+import { resolveAccessDestination } from '@/features/auth/access-destination'
+import { successXml } from '@/features/auth/register-icons'
 import { StartupReady } from '@/features/startup/StartupReady'
 import { ClubBottomNav } from '../category-policy/ClubBottomNav'
 import { venueIcons } from '../venues/venue-icons'
 import { planApi, planFailure } from './plan-api'
 import { PlanJourney, type PlanStep } from './PlanJourney'
 import { useClubPlan } from './use-club-plan'
-import { resumeRead, visibleEventUsage } from './plan-load'
+import { paymentCheckResult, resumeRead, visibleEventUsage, type PlanSnapshot } from './plan-load'
 import {
   capabilityLines,
   catalogMaterial,
@@ -59,14 +61,15 @@ function ClockIcon() {
   </Svg>
 }
 
-function Banner({ tone, title, body }: { tone: 'info' | 'warning' | 'neutral' | 'error' | 'success'; title: string; body: string }) {
-  const palette = tone === 'error' ? ['#fdecec', '#fac5c5'] : tone === 'warning' ? ['#fef5e7', '#fce1b3'] : tone === 'info' || tone === 'success' ? ['#ebf3fe', '#c2d8fc'] : ['#fefefe', '#e7e7e8']
+function Banner({ tone, title, body, checking, onCheck }: { tone: 'info' | 'warning' | 'neutral' | 'error' | 'success'; title: string; body: string; checking?: boolean; onCheck?: () => void }) {
+  const palette = tone === 'error' ? ['#fdecec', '#fac5c5'] : tone === 'warning' ? ['#fef5e7', '#fce1b3'] : tone === 'success' ? ['#e9f9ef', '#baedcd'] : tone === 'info' ? ['#ebf3fe', '#c2d8fc'] : ['#fefefe', '#e7e7e8']
   const icon = tone === 'error' ? 'error' : tone === 'warning' ? 'warning' : 'info'
   return <View accessibilityRole={tone === 'error' ? 'alert' : undefined} style={{ flexDirection: 'row', gap: 12, padding: 12, borderRadius: 12, borderWidth: 1, backgroundColor: palette[0], borderColor: palette[1] }}>
-    <Icon name={icon} />
-    <View style={{ flex: 1, gap: 2 }}>
+    {checking ? <ActivityIndicator size="small" color="#3676E0" /> : tone === 'success' ? <SvgXml xml={successXml} width={20} height={20} /> : <Icon name={icon} />}
+    <View accessibilityLiveRegion="polite" style={{ flex: 1, gap: 2 }}>
       <Text className="font-inter-600" style={{ fontSize: 14, lineHeight: 20, color: '#120f18' }}>{title}</Text>
       <Text className="font-sans" style={{ fontSize: 12, lineHeight: 16, color: '#605e64' }}>{body}</Text>
+      {onCheck ? <Button variant="link" className="self-start" onPress={onCheck}>Consultar estado</Button> : null}
     </View>
   </View>
 }
@@ -90,7 +93,9 @@ function failureCopy(kind: string | null): string {
 }
 
 export function ClubPlanScreen() {
-  const { user, destination, phase } = useAuth()
+  const { user, destination: authenticatedDestination, phase } = useAuth()
+  const destination = authenticatedDestination ?? (phase === 'checking' && user ? resolveAccessDestination(user.accessContexts) : null)
+  const { paymentReturn } = useLocalSearchParams<{ paymentReturn?: string }>()
   const context = destination?.kind === 'club' ? user?.accessContexts?.find(item => item.activity === 'CLUB' && item.clubId === destination.clubId) : null
   const permissions = context?.permissions ?? []
   const canView = (phase === 'ready' || (phase === 'checking' && Boolean(user))) && permissions.includes('VIEW_BILLING')
@@ -100,7 +105,10 @@ export function ClubPlanScreen() {
   const refresh = useRefreshControl(async () => { await plan.refresh() })
   const [step, setStep] = useState<PlanStep>({ name: 'closed' })
   const [busy, setBusy] = useState(false)
-  const [awaitingReturn, setAwaitingReturn] = useState(false)
+  const [paymentCheck, setPaymentCheck] = useState<'idle' | 'checking' | 'unavailable' | 'plan-mismatch'>('idle')
+  const openedCheckout = useRef(false)
+  const seenReturn = useRef<string | undefined>(undefined)
+  const checkPayment = useRef<() => void>(() => {})
   const [selector, setSelector] = useState(false)
   const consented = useRef<MaterialTerms | null>(null)
   const pendingLink = useRef<CheckoutLink | null>(null)
@@ -127,7 +135,9 @@ export function ClubPlanScreen() {
     actionLock.current = false
     setStep({ name: 'closed' })
     setBusy(false)
-    setAwaitingReturn(false)
+    openedCheckout.current = false
+    seenReturn.current = undefined
+    setPaymentCheck('idle')
     setSelector(false)
   }, [contextKey])
   useEffect(() => () => { journeyEpoch.current += 1 }, [])
@@ -135,12 +145,63 @@ export function ClubPlanScreen() {
   const active = (token: ReturnType<typeof capture>) => token.epoch === journeyEpoch.current && token.key === contextKeyRef.current && token.clubId === live.current.clubId && token.userId === live.current.userId
   const refreshPlan = useRef(plan.refresh)
   refreshPlan.current = plan.refresh
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
+    if (!canView) return
+    let generation = 0
+    let running = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    function stop() {
+      generation += 1
+      running = false
+      clearTimeout(timer)
+    }
+
+    function start(explicit: boolean, retries: number) {
+      if (running || AppState.currentState === 'background') return
+      running = true
+      const run = ++generation
+      let tracking = explicit
+      if (explicit) setPaymentCheck('checking')
+
+      async function read(remaining: number) {
+        const snapshot = await refreshPlan.current()
+        if (run !== generation) return
+        const result = paymentCheckResult(snapshot)
+        const pending = result === 'pending'
+        tracking ||= pending || Boolean(snapshot.charge?.planCode && snapshot.subscription?.requestedPlan?.planCode === snapshot.charge.planCode)
+        const waiting = pending || (tracking && result === 'plan-mismatch')
+        if (waiting && remaining > 0) {
+          setPaymentCheck('checking')
+          timer = setTimeout(() => void read(remaining - 1), 2500)
+          return
+        }
+        running = false
+        setPaymentCheck(tracking && (result === 'unavailable' || result === 'plan-mismatch') ? result : 'idle')
+      }
+
+      void read(retries)
+    }
+
+    const resume = () => {
+      const returnHint = typeof paymentReturn === 'string' && paymentReturn !== seenReturn.current
+      const returning = openedCheckout.current || returnHint
+      if (returnHint) seenReturn.current = paymentReturn
+      openedCheckout.current = false
+      start(returning, 3)
+    }
+    checkPayment.current = () => start(true, 0)
+    if (AppState.currentState !== 'background') resume()
     const subscription = AppState.addEventListener('change', next => {
-      if (next === 'active') void refreshPlan.current()
+      if (next === 'active') resume()
+      else stop()
     })
-    return () => subscription.remove()
-  }, [])
+    return () => {
+      stop()
+      subscription.remove()
+      checkPayment.current = () => {}
+    }
+  }, [canView, contextKey, paymentReturn]))
   const insets = useSafeAreaInsets()
   const back = useCallback(() => { if (router.canGoBack()) router.back(); else router.replace(HOME as Href) }, [])
   useEffect(() => {
@@ -191,15 +252,16 @@ export function ClubPlanScreen() {
     setStep({ name: 'error', title, body: failureCopy(kind) })
   }
 
-  const openPayment = async (url: string, token: ReturnType<typeof capture>) => {
+  const openPayment = async (url: string, token: ReturnType<typeof capture>, checkout = false) => {
     if (!active(token) || !sameServerUrl(authorizedUrl.current, url)) {
       setStep({ name: 'error', title: 'No pudimos abrir el pago', body: 'El destino no es el enlace devuelto para este club. No se abrió el navegador.' })
       return
     }
-    setAwaitingReturn(true)
+    openedCheckout.current = checkout
     setStep({ name: 'closed' })
     try { await Linking.openURL(url) } catch {
       if (!active(token)) return
+      openedCheckout.current = false
       setStep({ name: 'error', title: 'No pudimos abrir el navegador', body: 'Podés reintentar desde esta pantalla. Cerrar este aviso no cancela un cobro.' })
     }
   }
@@ -216,7 +278,7 @@ export function ClubPlanScreen() {
     if (!active(token) || live.current.clubId !== link.clubId) return
     const decision = decideOpen({ clubId: link.clubId, link, charge, readFailed, shown, nowMs: Date.now() })
     if (decision.kind === 'open') {
-      await openPayment(link.url, token)
+      await openPayment(link.url, token, true)
       return
     }
     if (decision.kind === 'mismatch' && charge) {
@@ -229,7 +291,6 @@ export function ClubPlanScreen() {
     if (decision.kind === 'applied') {
       await plan.reload()
       if (!active(token)) return
-      setAwaitingReturn(false)
       setStep({ name: 'message', title: 'Pago confirmado', body: 'El cobro ya está confirmado. No se abrió otro pago.' })
       return
     }
@@ -402,22 +463,42 @@ export function ClubPlanScreen() {
     return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8f8f8' }}><ActivityIndicator accessibilityLabel="Validando sesión" /></View>
   }
   if (phase === 'unverified') return <SessionUnverified />
-  if (phase !== 'ready' && phase !== 'checking') return <Redirect href="/login" />
+  if (phase !== 'ready' && phase !== 'checking') return <Redirect href={paymentReturn ? { pathname: '/login', params: { returnUrl: '/club/plan' } } : '/login'} />
   if (destination?.kind !== 'club') return <Redirect href="/events" />
 
   const headline = planHeadline(plan.usage, plan.subscription)
   const pending = pendingBanner(plan.subscription, plan.usage?.planCode ?? null)
   const followed = plan.charge ? chargeBanner(plan.charge) : null
+  const paymentResult = paymentCheckResult(plan)
+  let paymentNotice = followed
+  if (paymentCheck === 'checking') {
+    paymentNotice = { tone: 'info', title: 'Estamos verificando tu pago', body: 'El plan se actualiza cuando se confirma el cobro.' }
+  } else if (paymentResult === 'activated') {
+    paymentNotice = { tone: 'success', title: `Tu plan ${plan.charge?.planCode} ya está activo`, body: 'Ya podés usar los nuevos límites de tu club.' }
+  } else if (paymentResult === 'pending') {
+    paymentNotice = { tone: 'info', title: 'Todavía estamos esperando la confirmación', body: 'Podés seguir usando tu plan actual mientras se confirma el pago.' }
+  } else if (paymentCheck === 'unavailable' && paymentResult === 'unavailable') {
+    paymentNotice = { tone: 'info', title: 'No pudimos comprobar el pago', body: 'Podés volver a consultar su estado.' }
+  } else if (followed?.tone === 'success') {
+    paymentNotice = { tone: 'neutral', title: 'Pago registrado', body: 'El plan vigente es el que figura arriba.' }
+  }
+  const canCheckPayment = paymentCheck !== 'checking' && (
+    paymentResult === 'pending' ||
+    (paymentCheck === 'unavailable' && paymentResult === 'unavailable') ||
+    (paymentCheck === 'plan-mismatch' && paymentResult === 'plan-mismatch')
+  )
+  const explainsRequestedPlan = plan.charge?.planCode === plan.subscription?.requestedPlan?.planCode &&
+    (paymentCheck === 'checking' || paymentResult === 'pending' || paymentResult === 'activated')
   const banners = [
     ...(plan.usageError ? [{ tone: 'error' as const, title: 'No pudimos cargar el uso', body: 'No hay datos de consumo disponibles. Reintentá para consultar los límites y el uso actual.' }] : []),
-    ...(followed ? [followed] : []),
-    ...(pending ? [pending] : []),
+    ...(pending && !explainsRequestedPlan ? [pending] : []),
     ...usageBanners(plan.usage),
   ]
   const primary = primaryAction(plan.subscription, canManage)
+  const upgradeAfterPayment = primary === 'upgrade' && paymentResult === 'activated'
   const capabilities = capabilityLines(plan.usage?.plan ?? null)
   const showRetry = Boolean(plan.error || plan.usageError)
-  const footerLabel = showRetry && !plan.usage ? 'Reintentar' : primary === 'complete' ? 'Completar pago' : primary === 'browse' ? 'Ver planes' : primary === 'upgrade' ? 'Mejorar plan' : null
+  const footerLabel = paymentCheck === 'checking' ? null : showRetry && !plan.usage ? 'Reintentar' : primary === 'complete' ? 'Completar pago' : primary === 'browse' ? 'Ver planes' : primary === 'upgrade' ? 'Mejorar plan' : null
   const onFooter = () => {
     if (showRetry && !plan.usage) { void plan.reload(); return }
     if (primary === 'complete') complete()
@@ -445,8 +526,8 @@ export function ClubPlanScreen() {
             {headline.identity ? <Text className="font-sans" style={{ fontSize: 12, lineHeight: 16, color: '#605e64' }}>{headline.identity}</Text> : null}
             <Text className="font-sans" style={{ fontSize: 12, lineHeight: 16, color: '#605e64' }}>{headline.limitsReady ? 'Límites vigentes del club' : 'No pudimos consultar los límites vigentes.'}</Text>
           </View> : null}
+          {paymentNotice ? <Banner {...paymentNotice} checking={paymentCheck === 'checking'} onCheck={canCheckPayment ? () => checkPayment.current() : undefined} /> : null}
           {plan.subscription?.recurrenceMessage ? <Banner tone="info" title="Renovación" body={plan.subscription.recurrenceMessage} /> : null}
-          {awaitingReturn ? <Banner tone="info" title="Comprobá el pago al volver" body="Volvé a esta pantalla para consultar el estado. Cerrar el navegador no cancela el cobro." /> : null}
           {banners.map(item => <Banner key={item.title + item.body} tone={item.tone} title={item.title} body={item.body} />)}
           {plan.loading && headline && !plan.usage ? <View accessibilityLabel="Cargando el uso" style={{ gap: 12 }}>
             <Text className="font-inter-600" style={{ fontSize: 18, lineHeight: 24, color: '#120f18' }}>Uso del club y del torneo</Text>
@@ -481,13 +562,13 @@ export function ClubPlanScreen() {
             <Text className="font-inter-600" style={{ fontSize: 18, lineHeight: 24, color: '#120f18' }}>Incluido en {plan.usage.planCode}</Text>
             {capabilities.map(line => <Text key={line} className="font-inter-500" style={{ fontSize: 14, lineHeight: 20, color: '#605e64' }}>{line}</Text>)}
           </View> : null}
-          {canManage ? <Text className="font-sans" style={{ fontSize: 12, lineHeight: 16, color: '#605e64' }}>El cambio se activa cuando se confirma el pago.</Text> : null}
+          {canManage && !paymentNotice ? <Text className="font-sans" style={{ fontSize: 12, lineHeight: 16, color: '#605e64' }}>El cambio se activa cuando se confirma el pago.</Text> : null}
           {canManage && plan.subscription?.recurrenceResumeAction === 'RESUME_RENEWAL' ? <Button variant="secondary" onPress={startResume} style={{ height: 48, borderRadius: 8 }}>Reanudar renovación</Button> : null}
           {canManage && plan.subscription?.recurrenceResumeAction === 'AUTHORIZE_RENEWAL' ? <Button variant="secondary" onPress={() => setStep({ name: 'authorize' })} style={{ height: 48, borderRadius: 8 }}>Autorizar renovación</Button> : null}
           {showRetry && plan.usage ? <Button onPress={() => void plan.reload()} style={{ height: 48, borderRadius: 8 }}>Reintentar</Button> : null}
         </RefreshableScrollView>
         {footerLabel ? <View style={{ padding: 16, backgroundColor: '#f8f8f8' }}>
-          <Button onPress={onFooter} disabled={plan.loading || busy} style={{ height: 48, borderRadius: 8, backgroundColor: '#c9cf38' }}>{footerLabel}</Button>
+          <Button variant={upgradeAfterPayment ? 'secondary' : 'primary'} onPress={onFooter} disabled={plan.loading || busy} style={{ height: 48, borderRadius: 8, backgroundColor: upgradeAfterPayment ? 'transparent' : '#c9cf38' }}>{footerLabel}</Button>
         </View> : null}
       </>}
       <ClubBottomNav onDashboard={() => router.replace('/dashboard')} onClub={() => router.replace(HOME as Href)} bottomInset={insets.bottom} />

@@ -14,9 +14,12 @@ try {
   const loadOutput = ts.transpileModule(loadSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } })
   const loadCompiled = path.join(directory, 'plan-load.cjs')
   writeFileSync(loadCompiled, loadOutput.outputText.replace("require(\"./plan-model\")", "require(\"./plan-model.cjs\")"))
+  const linkSource = readFileSync(path.join(__dirname, '../src/features/club/plan/payment-return-link.ts'), 'utf8')
+  const linkCompiled = path.join(directory, 'payment-return-link.cjs')
+  writeFileSync(linkCompiled, ts.transpileModule(linkSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText)
   const result = spawnSync(process.execPath, ['--test', path.join(__dirname, '../tests/plan-model.test.cjs')], {
     stdio: 'inherit',
-    env: { ...process.env, PLAN_TEST_MODULE: compiled, PLAN_LOAD_TEST_MODULE: loadCompiled },
+    env: { ...process.env, PLAN_TEST_MODULE: compiled, PLAN_LOAD_TEST_MODULE: loadCompiled, PAYMENT_RETURN_TEST_MODULE: linkCompiled },
   })
   if (result.error) throw result.error
   process.exitCode = result.status ?? 1
