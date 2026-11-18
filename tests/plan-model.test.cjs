@@ -1,10 +1,35 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const plan = require(process.env.PLAN_TEST_MODULE)
-const { createPlanReads, visibleEventUsage, resumeRead } = require(process.env.PLAN_LOAD_TEST_MODULE)
+const { createPlanReads, visibleEventUsage, resumeRead, paymentCheckResult } = require(process.env.PLAN_LOAD_TEST_MODULE)
+const { redirectPaymentReturn } = require(process.env.PAYMENT_RETURN_TEST_MODULE)
 
 const eventId = '11111111-1111-1111-1111-111111111111'
 const reference = 'pcabcdef1234567890'
+
+test('checkout return opens the plan without carrying provider results or a club into the route', () => {
+  const web = 'https://padelcheck-fe.pages.dev/billing/return?status=approved&external_reference=other-club'
+  assert.equal(redirectPaymentReturn(web), '/club/plan?paymentReturn=1')
+  assert.equal(redirectPaymentReturn('padelcheck://billing/return?payment_id=123'), '/club/plan?paymentReturn=2')
+  assert.equal(redirectPaymentReturn('/billing/return?status=pending'), '/club/plan?paymentReturn=3')
+  assert.equal(redirectPaymentReturn('https://other.example/billing/return'), 'https://other.example/billing/return')
+  assert.equal(redirectPaymentReturn('//other.example/billing/return'), '//other.example/billing/return')
+  assert.equal(redirectPaymentReturn('/reset-password?token=example'), '/reset-password?token=example')
+})
+
+test('verification waits for an applied charge and the matching effective plan', () => {
+  const snapshot = { fresh: true, forbidden: false, usage: { planCode: 'FREE' }, charge: { status: 'OPEN', planCode: 'PRO' } }
+  assert.equal(paymentCheckResult(snapshot), 'pending')
+  assert.equal(paymentCheckResult({ ...snapshot, charge: null }), 'unavailable')
+  const applied = { ...snapshot, charge: { status: 'APPLIED', planCode: 'PRO' } }
+  assert.equal(paymentCheckResult(applied), 'plan-mismatch')
+  const pro = { ...applied, usage: { planCode: 'PRO' } }
+  assert.equal(paymentCheckResult(pro), 'activated')
+  assert.equal(paymentCheckResult({ ...pro, fresh: false }), 'unavailable')
+  for (const status of ['FAILED', 'CANCELED', 'UNAPPLIED']) {
+    assert.equal(paymentCheckResult({ ...pro, charge: { ...pro.charge, status } }), 'settled')
+  }
+})
 
 function meter(extra = {}) {
   return { key: 'confirmedEntries', state: 'LIMITED', limit: 120, used: 48, warning: false, reached: false, exceeded: false, ...extra }
