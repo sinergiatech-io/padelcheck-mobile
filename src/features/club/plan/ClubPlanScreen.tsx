@@ -477,12 +477,16 @@ export function ClubPlanScreen() {
     paymentNotice = { tone: 'success', title: `Tu plan ${plan.charge?.planCode} ya está activo`, body: 'Ya podés usar los nuevos límites de tu club.' }
   } else if (paymentResult === 'pending') {
     paymentNotice = { tone: 'info', title: 'Todavía estamos esperando la confirmación', body: 'Podés seguir usando tu plan actual mientras se confirma el pago.' }
-  } else if (paymentCheck === 'unavailable') {
+  } else if (paymentCheck === 'unavailable' && paymentResult === 'unavailable') {
     paymentNotice = { tone: 'info', title: 'No pudimos comprobar el pago', body: 'Podés volver a consultar su estado.' }
   } else if (followed?.tone === 'success') {
     paymentNotice = { tone: 'neutral', title: 'Pago registrado', body: 'El plan vigente es el que figura arriba.' }
   }
-  const canCheckPayment = paymentCheck !== 'checking' && (paymentResult === 'pending' || paymentCheck === 'unavailable' || paymentCheck === 'plan-mismatch')
+  const canCheckPayment = paymentCheck !== 'checking' && (
+    paymentResult === 'pending' ||
+    (paymentCheck === 'unavailable' && paymentResult === 'unavailable') ||
+    (paymentCheck === 'plan-mismatch' && paymentResult === 'plan-mismatch')
+  )
   const explainsRequestedPlan = plan.charge?.planCode === plan.subscription?.requestedPlan?.planCode &&
     (paymentCheck === 'checking' || paymentResult === 'pending' || paymentResult === 'activated')
   const banners = [
