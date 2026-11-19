@@ -140,9 +140,14 @@ export function ClubOnboardingScreen({ verification = false }: { verification?: 
   const dashboard = () => auth.phase === 'ready' && auth.user ? router.replace('/dashboard') : openLogin('/dashboard')
   const copy = copyFor(view, { email: state.email, payment: state.payment, plan: state.plan, completedPlan: state.completedPlan })
   const working = busy !== null
+  const consultingPayment = busy === 'payment'
+
+  useEffect(() => {
+    if (consultingPayment) AccessibilityInfo.announceForAccessibility('Consultando estado del pago…')
+  }, [consultingPayment])
 
   const primary = (label: string, onPress: () => void, loadingLabel = `${label}…`) =>
-    <Button accessibilityLabel={label} loading={working} loadingLabel={loadingLabel} onPress={onPress} className={`h-[48px] rounded-[8px] disabled:opacity-100 ${working ? 'bg-[#EEF0C1]' : 'bg-[#C9CF38]'}`}>
+    <Button accessibilityLabel={label} disabled={working} loading={working && !consultingPayment} loadingLabel={loadingLabel} onPress={onPress} className={`h-[48px] rounded-[8px] disabled:opacity-100 ${working ? 'bg-[#EEF0C1]' : 'bg-[#C9CF38]'}`}>
       <Text className="font-inter-500 text-[14px] leading-[21px] text-[#120F18]">{label}</Text>
     </Button>
   const ghost = (label: string, onPress: () => void) =>
