@@ -36,6 +36,16 @@ export function RegistrationLocationFields({ model, state, disabled, wizard = fa
   const provinceLabel = state.province?.name ?? (state.provinceStatus === 'loading' ? 'Cargando provincias…' : provincePlaceholder)
   const localityLabel = state.selection?.localityName ?? (!state.province || state.localityStatus !== 'loading' ? localityIdle : 'Cargando localidades…')
   return <Fragment>
+    {wizard && legacy && !state.selection ? <Banner tone="warning" title="Ubicación anterior sin asociar" detail={`Teníamos guardado: ${legacy}. Elegí provincia y localidad del catálogo.`} /> : null}
+    {wizard && (state.provinceStatus === 'error' || state.localityStatus === 'error') ? (
+      <View className="gap-[8px]">
+        <Banner title={state.provinceStatus === 'error' ? 'No pudimos cargar provincias' : 'No pudimos cargar localidades'} detail="Revisá tu conexión. Tus datos se conservaron." />
+        <Button variant="ghost" disabled={disabled} onPress={() => {
+          if (state.provinceStatus === 'error') void model.loadProvinces()
+          if (state.localityStatus === 'error') void model.loadLocalities()
+        }}>Reintentar carga</Button>
+      </View>
+    ) : null}
     <View className="gap-[8px]">
       <Text className="font-inter-500 text-[14px] leading-[20px] text-[#120F18]">País</Text>
       <TextInput accessibilityLabel="País, Argentina" value="Argentina" editable={false} style={wizard ? { backgroundColor: '#F7F7F7' } : undefined} className={`${fieldClass} border-[#B6B5B7] bg-[#F7F7F7] font-inter-500 text-[14px] text-[#605E64]`} />
@@ -67,6 +77,11 @@ export function RegistrationLocationFields({ model, state, disabled, wizard = fa
         <SelectContent>{localityOptions.map(option => <SelectItem key={option.id} value={option.id}>{option.name}</SelectItem>)}</SelectContent>
       </Select>}
       {state.errors.locality && <Text accessibilityRole="alert" className="text-right font-inter-500 text-[14px] leading-[20px] text-[#AA3030]">{state.errors.locality}</Text>}
+      {wizard && state.province && state.changedFrom && !state.selection ? (
+        <Text accessibilityLiveRegion="polite" className="font-sans text-[14px] leading-[20px] text-[#605E64]">
+          Cambiaste la provincia. Elegí una localidad de {state.province.name}.
+        </Text>
+      ) : null}
       {!wizard && state.province && state.localityStatus === 'error' && <Retry label="No pudimos cargar las localidades." onRetry={() => { void model.loadLocalities() }} />}
     </View>
   </Fragment>
