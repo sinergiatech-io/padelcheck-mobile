@@ -26,6 +26,8 @@ export const AUTH_COPY = {
   pending: 'Tu cuenta requiere completar la configuración.',
   emptyContext: 'No hay un contexto de acceso disponible para esta cuenta.',
   continuationLater: 'Esa continuación todavía no está disponible.',
+  pendingDetail: 'Retomá el registro de tu club donde lo dejaste.',
+  continueRegistration: 'Continuar registro',
   retry: 'Reintentar comprobación',
   retrySession: 'Reintentar',
   backToAccess: 'Volver al acceso',
@@ -69,7 +71,7 @@ export function continueMessage(reason: ContinueReason): { title: string; detail
     return { title: AUTH_COPY.multiple, detail: AUTH_COPY.continuationLater }
   }
   if (reason === 'pending-setup') {
-    return { title: AUTH_COPY.pending, detail: AUTH_COPY.continuationLater }
+    return { title: AUTH_COPY.pending, detail: AUTH_COPY.pendingDetail }
   }
   return { title: AUTH_COPY.emptyContext }
 }

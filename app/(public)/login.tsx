@@ -260,15 +260,15 @@ export default function LoginScreen() {
               <SvgXml xml={personXml} width={20} height={20} />
               <Text className="font-inter-500 text-[14px] leading-[21px] text-[#120F18]">Jugador</Text>
             </Pressable>
-            <View
+            <Pressable
               accessibilityRole="button"
-              accessibilityState={{ disabled: true }}
               accessibilityLabel="Club"
+              onPress={() => router.push('/register/club')}
               className="h-[48px] flex-1 flex-row items-center justify-center gap-[8px] rounded-[8px] border border-[#929195] pl-[8px] pr-[16px]"
             >
               <SvgXml xml={clubXml} width={20} height={20.5} />
               <Text className="font-inter-500 text-[14px] leading-[21px] text-[#120F18]">Club</Text>
-            </View>
+            </Pressable>
           </View>
         </View>
       </ScrollView>

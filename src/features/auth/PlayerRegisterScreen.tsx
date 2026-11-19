@@ -1,42 +1,16 @@
-import { useEffect, useRef, useState, type ReactNode, type ElementRef } from 'react'
+import { useEffect, useRef, useState, type ElementRef } from 'react'
 import { router, useLocalSearchParams } from 'expo-router'
-import { AccessibilityInfo, findNodeHandle, Image, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { AccessibilityInfo, findNodeHandle, Keyboard, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { SvgXml } from 'react-native-svg'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { StartupReady } from '@/features/startup/StartupReady'
 import { usePlayerRegistration, validateDraft, statusCopy, type Draft, type Proof } from './player-registration'
-import { courtXml, eyeXml, eyeOnXml } from './auth-icons'
-import { chevronXml, infoXml, successXml, errorXml, warningXml } from './register-icons'
+import { eyeXml, eyeOnXml } from './auth-icons'
+import { chevronXml } from './register-icons'
 import { useRegistrationLocation } from './use-registration-location'
 import { nativePosition } from './native-location'
 import { RegistrationLocationFields } from './RegistrationLocationFields'
-
-const tones = { info: 'border-[#C2D8FC] bg-[#EBF3FE]', success: 'border-[#BAEDCD] bg-[#E9F9EF]', error: 'border-[#FAC5C5] bg-[#FDECEC]', warning: 'border-[#FCE1B3] bg-[#FEF5E7]' }
-function Banner({ title, detail, tone = 'error' }: { title: string; detail: string; tone?: keyof typeof tones }) {
-  return <View accessibilityRole="alert" className={`flex-row items-center gap-[12px] rounded-[8px] border p-[12px] ${tones[tone]}`}>
-    <View className="h-[24px] w-[24px] items-center justify-center"><SvgXml xml={{ info: infoXml, success: successXml, error: errorXml, warning: warningXml }[tone]} /></View>
-    <View className="min-w-0 flex-1"><Text className="font-inter-600 text-[14px] leading-[20px] text-[#120F18]">{title}</Text><Text className="mt-[2px] font-sans text-[12px] leading-[16px] text-[#605E64]">{detail}</Text></View>
-  </View>
-}
-function Shell({ children }: { children: ReactNode }) {
-  const insets = useSafeAreaInsets()
-  const [keyboard, setKeyboard] = useState(false)
-  useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboard(true))
-    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboard(false))
-    return () => { show.remove(); hide.remove() }
-  }, [])
-  return <StartupReady><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1 bg-[#120F18]" style={{ paddingTop: insets.top }}>
-    <View style={{ height: keyboard ? 72 : 124, overflow: 'hidden' }}>
-      <SvgXml xml={courtXml} width="100%" height={172} />
-      <Image source={require('../../../assets/auth/logo.png')} accessibilityLabel="Padel Check" resizeMode="contain" style={{ position: 'absolute', top: keyboard ? 8 : 16, left: '50%', marginLeft: keyboard ? -28 : -46, width: keyboard ? 56 : 92, height: keyboard ? 55 : 91 }} />
-    </View>
-    <View className="min-h-0 flex-1 overflow-hidden rounded-t-[24px] bg-[#FEFEFE]" style={{ paddingBottom: keyboard ? 0 : insets.bottom }}>{children}</View>
-  </KeyboardAvoidingView></StartupReady>
-}
-const fieldClass = 'h-[56px] rounded-[8px] border border-[#929195] bg-[#FEFEFE] px-[16px] font-inter-500 text-[14px] text-[#120F18]'
+import { Banner, Shell, fieldClass } from './RegisterShell'
 export function PlayerRegisterScreen({ verification = false }: { verification?: boolean }) {
   const params = useLocalSearchParams<{ sessionId?: string; email?: string; token?: string; returnUrl?: string }>()
   const [initialProof] = useState<Proof | undefined>(() => verification ? { sessionId: params.sessionId ?? '', email: params.email ?? '', token: params.token ?? '' } : undefined)

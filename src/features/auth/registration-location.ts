@@ -25,6 +25,8 @@ export type LocationState = {
   provinceStatus: 'idle' | 'loading' | 'ready' | 'error'
   localityStatus: 'idle' | 'loading' | 'ready' | 'error'
   errors: { province?: string; locality?: string }
+  /** Province replaced while a locality was already chosen (wizard notice only). */
+  changedFrom?: string
 }
 const initialState = (): LocationState => ({
   mode: 'form', provinces: [], province: null, localities: [], selection: null,
@@ -140,7 +142,9 @@ export class RegistrationLocation {
   async selectProvince(province: Province) {
     if (!this.state.provinces.some(item => item.id === province.id)) return
     this.stopDetection()
-    this.update({ mode: 'form', province, selection: null, localities: [], localityStatus: 'idle', errors: {} })
+    const previous = this.state.province
+    const changedFrom = previous && previous.id !== province.id && this.state.selection ? previous.name : undefined
+    this.update({ mode: 'form', province, selection: null, localities: [], localityStatus: 'idle', errors: {}, changedFrom })
     await this.loadLocalities()
   }
   async loadLocalities() {
@@ -174,11 +178,28 @@ export class RegistrationLocation {
       this.update({ localities, localityStatus: 'ready' })
     } catch { if (this.current('localities', controller)) this.update({ localityStatus: 'error' }) }
   }
+  /** Seeds a saved catalog location (club resume or venue preload). Editable afterwards; never uses GPS. */
+  async preset(value: { provinceId: string; provinceName: string; localityId: string; localityName: string } | null) {
+    this.stopDetection()
+    if (!value) {
+      this.update({ province: null, selection: null, localities: [], localityStatus: 'idle', errors: {}, changedFrom: undefined })
+      return
+    }
+    const province = { id: value.provinceId, name: value.provinceName }
+    this.update({
+      mode: 'form', problem: undefined, errors: {}, changedFrom: undefined, province,
+      provinces: this.state.provinces.some(item => item.id === province.id) ? this.state.provinces : [...this.state.provinces, province],
+      selection: { countryCode: 'AR', provinceId: province.id, provinceName: province.name, localityId: value.localityId, localityName: value.localityName },
+      localities: [{ id: value.localityId, name: value.localityName, provinceId: province.id }],
+      localityStatus: 'idle',
+    })
+    await this.loadLocalities()
+  }
   selectLocality(locality: Locality) {
     if (!this.state.localities.some(item => item.id === locality.id) || this.state.province?.id !== locality.provinceId) return
     this.stopDetection()
     this.update({
-      mode: 'form', problem: undefined, errors: {},
+      mode: 'form', problem: undefined, errors: {}, changedFrom: undefined,
       selection: {
         countryCode: 'AR', provinceId: locality.provinceId, provinceName: this.state.province.name,
         localityId: locality.id, localityName: locality.name,

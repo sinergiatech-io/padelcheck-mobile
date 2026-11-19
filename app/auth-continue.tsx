@@ -1,7 +1,7 @@
 import { StartupReady } from '@/features/startup/StartupReady'
 import { useEffect } from 'react'
 import { BackHandler, Pressable, Text, View } from 'react-native'
-import { Redirect, Stack } from 'expo-router'
+import { Redirect, Stack, router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuth } from '@/context/AuthContext'
 import { acceptedReturnPath } from '@/features/auth/access-destination'
@@ -34,7 +34,19 @@ export default function AuthContinueScreen() {
       <Stack.Screen options={{ gestureEnabled: false, headerShown: false }} />
       <Text className="font-inter-600 text-2xl leading-8 text-[#120F18]">{message.title}</Text>
       {message.detail ? <Text className="mt-3 font-sans text-base leading-6 text-[#605E64]">{message.detail}</Text> : null}
-      <Pressable onPress={retryValidation} className="mt-8 h-12 items-center justify-center rounded-lg bg-[#C9CF38]">
+      {reason === 'pending-setup' ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.replace('/register/club')}
+          className="mt-8 h-12 items-center justify-center rounded-lg bg-[#C9CF38]"
+        >
+          <Text className="font-inter-500 text-sm text-[#120F18]">{AUTH_COPY.continueRegistration}</Text>
+        </Pressable>
+      ) : null}
+      <Pressable
+        onPress={retryValidation}
+        className={`${reason === 'pending-setup' ? 'mt-3 border border-[#120F18]' : 'mt-8 bg-[#C9CF38]'} h-12 items-center justify-center rounded-lg`}
+      >
         <Text className="font-inter-500 text-sm text-[#120F18]">{AUTH_COPY.retry}</Text>
       </Pressable>
       <Pressable
