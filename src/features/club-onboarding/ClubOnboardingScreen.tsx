@@ -284,7 +284,11 @@ export function ClubOnboardingScreen({ verification = false }: { verification?: 
   const firstError = useMemo(() => Object.values(state.accountErrors)[0] ?? state.clubError ?? state.venueErrors.name ?? state.venueErrors.courts ?? Object.values(state.venueErrors.courtNames)[0] ?? null, [state.accountErrors, state.clubError, state.venueErrors])
   useEffect(() => { if (firstError) AccessibilityInfo.announceForAccessibility(firstError) }, [firstError])
 
+  // Each step owns its native subtree. In particular, a payment result may replace
+  // several footer buttons with a single action while Android resumes the activity.
+  const layoutKey = view === 'payment' ? `payment-${state.payment}` : view
   return <Shell avoidKeyboard>
+    <View key={layoutKey} collapsable={false} className="min-h-0 flex-1">
     <ScrollView removeClippedSubviews={false} ref={scroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={false} scrollEventThrottle={16}
       onScroll={event => { scrollOffset.current = event.nativeEvent.contentOffset.y }} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 16, paddingTop: 24, paddingBottom: 24, gap: 16 }}>
       <View className="gap-[8px]">
@@ -298,5 +302,6 @@ export function ClubOnboardingScreen({ verification = false }: { verification?: 
       {footerNote ? <Text className="font-inter-500 text-[14px] leading-[20px] text-[#605E64]">{footerNote}</Text> : null}
       {footer}
     </View> : null}
+    </View>
   </Shell>
 }
