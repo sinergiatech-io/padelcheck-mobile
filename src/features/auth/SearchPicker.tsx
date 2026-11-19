@@ -59,7 +59,7 @@ export function SearchPicker({ title, placeholder, searchPlaceholder, options, v
           <View className="min-h-0 flex-1 pt-[8px]">
             {visible.length === 0
               ? <View className="pt-[8px]"><Banner tone="info" title="Sin coincidencias" detail="Probá con otro nombre. Tu búsqueda se conserva." /></View>
-              : <FlatList data={visible} keyExtractor={item => item.id} keyboardShouldPersistTaps="handled" initialNumToRender={20} renderItem={({ item }) => {
+              : <FlatList removeClippedSubviews={false} data={visible} keyExtractor={item => item.id} keyboardShouldPersistTaps="handled" initialNumToRender={20} renderItem={({ item }) => {
                 const selected = item.id === value
                 return <Pressable accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={item.name} onPress={() => { onSelect(item.id); close() }}
                   className={`min-h-[48px] justify-center border-b border-[#E7E7E8] px-[8px] ${selected ? 'bg-[#EEF0C1]' : ''}`}>

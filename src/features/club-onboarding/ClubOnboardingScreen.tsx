@@ -285,7 +285,7 @@ export function ClubOnboardingScreen({ verification = false }: { verification?: 
   useEffect(() => { if (firstError) AccessibilityInfo.announceForAccessibility(firstError) }, [firstError])
 
   return <Shell avoidKeyboard>
-    <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={false} scrollEventThrottle={16}
+    <ScrollView removeClippedSubviews={false} ref={scroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={false} scrollEventThrottle={16}
       onScroll={event => { scrollOffset.current = event.nativeEvent.contentOffset.y }} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 16, paddingTop: 24, paddingBottom: 24, gap: 16 }}>
       <View className="gap-[8px]">
         {copy.eyebrow ? <Text className="font-inter-600 text-[14px] leading-[20px] text-[#605E64]">{copy.eyebrow}</Text> : null}
