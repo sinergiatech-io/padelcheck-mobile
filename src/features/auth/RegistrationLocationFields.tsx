@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SvgXml } from 'react-native-svg'
 import { chevronXml } from './register-icons'
 import { Banner } from './RegisterShell'
+import { SearchPicker } from './SearchPicker'
 import type { RegistrationLocation, LocationState } from './registration-location'
 
 const fieldClass = 'h-[56px] rounded-[8px] border border-[#929195] bg-[#FEFEFE] px-[16px]'
@@ -37,27 +38,34 @@ export function RegistrationLocationFields({ model, state, disabled, wizard = fa
   return <Fragment>
     <View className="gap-[8px]">
       <Text className="font-inter-500 text-[14px] leading-[20px] text-[#120F18]">País</Text>
-      <TextInput accessibilityLabel="País, Argentina" value="Argentina" editable={false} className={`${fieldClass} border-[#B6B5B7] bg-[#F7F7F7] font-inter-500 text-[14px] text-[#605E64]`} />
+      <TextInput accessibilityLabel="País, Argentina" value="Argentina" editable={false} style={wizard ? { backgroundColor: '#F7F7F7' } : undefined} className={`${fieldClass} border-[#B6B5B7] bg-[#F7F7F7] font-inter-500 text-[14px] text-[#605E64]`} />
     </View>
     <View className="gap-[8px]">
       <Text className="font-inter-500 text-[14px] leading-[20px] text-[#120F18]">Provincia<Text className="text-[#EF4444]">*</Text></Text>
-      <Select value={state.province?.id} onValueChange={id => { const province = provinceOptions.find(item => item.id === id); if (province) void model.selectProvince(province) }}>
+      {wizard ? <SearchPicker title="Provincia" placeholder={state.provinceStatus === 'loading' ? 'Cargando provincias…' : provincePlaceholder} searchPlaceholder="Buscar provincia" options={provinceOptions}
+        value={state.province?.id} valueLabel={state.province?.name} disabled={provinceDisabled} invalid={!!state.errors.province}
+        accessibilityLabel={`Provincia, obligatorio, ${provinceLabel}${state.errors.province ? ', ' + state.errors.province : ''}`}
+        onSelect={id => { const province = provinceOptions.find(item => item.id === id); if (province) void model.selectProvince(province) }} /> : <Select value={state.province?.id} onValueChange={id => { const province = provinceOptions.find(item => item.id === id); if (province) void model.selectProvince(province) }}>
         <SelectTrigger disabled={provinceDisabled} accessibilityRole="button" accessibilityLabel={`Provincia, obligatorio, ${provinceLabel}${state.errors.province ? ', ' + state.errors.province : ''}`} accessibilityState={{ disabled: provinceDisabled }} className={`${fieldClass} disabled:opacity-100 ${state.errors.province ? 'border-[#EF4444]' : ''}`} indicator={<SvgXml xml={chevronXml} />}>
           <SelectValue className={`font-inter-500 text-[14px] leading-[20px] ${state.province ? 'text-[#120F18]' : 'text-[#605E64]'}`} placeholder={state.provinceStatus === 'loading' ? 'Cargando provincias…' : provincePlaceholder} />
         </SelectTrigger>
         <SelectContent>{provinceOptions.map(option => <SelectItem key={option.id} value={option.id}>{option.name}</SelectItem>)}</SelectContent>
-      </Select>
+      </Select>}
       {state.errors.province && <Text accessibilityRole="alert" className="text-right font-inter-500 text-[14px] leading-[20px] text-[#AA3030]">{state.errors.province}</Text>}
       {!wizard && state.provinceStatus === 'error' && <Retry label="No pudimos cargar las provincias." onRetry={() => { void model.loadProvinces() }} />}
     </View>
     <View className="gap-[8px]">
       <Text className="font-inter-500 text-[14px] leading-[20px] text-[#120F18]">Localidad<Text className="text-[#EF4444]">*</Text></Text>
-      <Select value={state.selection?.localityId} onValueChange={id => { const locality = localityOptions.find(item => item.id === id); if (locality) model.selectLocality(locality) }}>
-        <SelectTrigger disabled={localityDisabled} accessibilityRole="button" accessibilityLabel={`Localidad, obligatorio, ${localityLabel}${state.errors.locality ? ', ' + state.errors.locality : ''}`} accessibilityState={{ disabled: localityDisabled }} className={`${fieldClass} ${!state.province && !disabled ? 'disabled:opacity-100' : ''} ${state.errors.locality ? 'border-[#EF4444]' : ''}`} indicator={<SvgXml xml={chevronXml} />}>
+      {wizard ? <SearchPicker title="Localidad" placeholder={state.province && state.localityStatus === 'loading' && !state.selection ? 'Cargando localidades…' : localityIdle} searchPlaceholder="Buscar localidad" options={localityOptions}
+        value={state.selection?.localityId} valueLabel={state.selection?.localityName} disabled={localityDisabled} invalid={!!state.errors.locality}
+        style={!state.province ? { backgroundColor: '#F7F7F7' } : undefined}
+        accessibilityLabel={`Localidad, obligatorio, ${localityLabel}${state.errors.locality ? ', ' + state.errors.locality : ''}`}
+        onSelect={id => { const locality = localityOptions.find(item => item.id === id); if (locality) model.selectLocality(locality) }} /> : <Select value={state.selection?.localityId} onValueChange={id => { const locality = localityOptions.find(item => item.id === id); if (locality) model.selectLocality(locality) }}>
+        <SelectTrigger disabled={localityDisabled} accessibilityRole="button" accessibilityLabel={`Localidad, obligatorio, ${localityLabel}${state.errors.locality ? ', ' + state.errors.locality : ''}`} accessibilityState={{ disabled: localityDisabled }} style={wizard && !state.province ? { backgroundColor: '#F7F7F7' } : undefined} className={`${fieldClass} ${!state.province && !disabled ? 'disabled:opacity-100' : ''} ${state.errors.locality ? 'border-[#EF4444]' : ''}`} indicator={<SvgXml xml={chevronXml} />}>
           <SelectValue className={`font-inter-500 text-[14px] leading-[20px] ${state.selection ? 'text-[#120F18]' : 'text-[#605E64]'}`} placeholder={!state.province || state.localityStatus !== 'loading' || state.selection ? localityIdle : 'Cargando localidades…'} />
         </SelectTrigger>
         <SelectContent>{localityOptions.map(option => <SelectItem key={option.id} value={option.id}>{option.name}</SelectItem>)}</SelectContent>
-      </Select>
+      </Select>}
       {state.errors.locality && <Text accessibilityRole="alert" className="text-right font-inter-500 text-[14px] leading-[20px] text-[#AA3030]">{state.errors.locality}</Text>}
       {!wizard && state.province && state.localityStatus === 'error' && <Retry label="No pudimos cargar las localidades." onRetry={() => { void model.loadLocalities() }} />}
     </View>

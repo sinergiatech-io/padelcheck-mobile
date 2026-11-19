@@ -83,15 +83,18 @@ export function ClubOnboardingScreen({ verification = false }: { verification?: 
   const focused = useRef<string | null>(null)
   const reveal = () => {
     const input = focused.current ? inputs.current[focused.current] : null
-    const limit = keyboardTop.current
-    if (!input || !scroll.current || limit == null) return
-    input.measureInWindow((_x, y, _w, height) => {
-      const overflow = y + height + 12 - limit
-      if (overflow > 0) scroll.current?.scrollTo({ y: scrollOffset.current + overflow + 28, animated: true })
+    const scroller = scroll.current
+    if (!input || !scroller || keyboardTop.current == null) return
+    // The scroll viewport already ends above the fixed footer, which sits above the keyboard.
+    scroller.measureInWindow((_sx, sy, _sw, sh) => {
+      input.measureInWindow((_x, y, _w, height) => {
+        const overflow = y + height + 12 - (sy + sh)
+        if (overflow > 0) scroller.scrollTo({ y: scrollOffset.current + overflow + 16, animated: true })
+      })
     })
   }
   useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', event => { keyboardTop.current = event.endCoordinates.screenY; setTimeout(reveal, 80) })
+    const show = Keyboard.addListener('keyboardDidShow', event => { keyboardTop.current = event.endCoordinates.screenY; setTimeout(reveal, 200) })
     const hide = Keyboard.addListener('keyboardDidHide', () => { keyboardTop.current = null })
     return () => { show.remove(); hide.remove() }
   }, [])
@@ -102,8 +105,8 @@ export function ClubOnboardingScreen({ verification = false }: { verification?: 
     if (!authSettled || started.current) return
     started.current = true
     if (verification) {
+      // The route key follows the link parameters, so they stay put: clearing them would remount with an empty proof.
       void flow.verifyLink(proof)
-      router.setParams({ sessionId: undefined, email: undefined, token: undefined })
     } else void flow.open(hasBearer)
   }, [authSettled])
 
@@ -149,9 +152,12 @@ export function ClubOnboardingScreen({ verification = false }: { verification?: 
   const input = (key: string, props: TextInputProps & { error?: boolean }) => {
     const { error, ...rest } = props
     return <TextInput ref={node => { inputs.current[key] = node }} editable={!working} placeholderTextColor="#605E64" accessibilityState={{ disabled: working }}
-      onFocus={() => { focused.current = key; setTimeout(reveal, 80) }} className={`${fieldClass} ${error ? 'border-[#EF4444]' : ''}`} {...rest} />
+      onFocus={() => { focused.current = key; setTimeout(reveal, 200) }} className={`${fieldClass} ${error ? 'border-[#EF4444]' : ''}`} {...rest} />
   }
-  const setAccountField = (key: keyof AccountDraft, value: string) => setAccount(current => ({ ...current, [key]: value }))
+  const setAccountField = (key: keyof AccountDraft, value: string) => {
+    setAccount(current => ({ ...current, [key]: value }))
+    if (key !== 'phone') flow.clearAccountError(key)
+  }
 
   let body: ReactNode = null
   let footer: ReactNode = null
@@ -207,7 +213,7 @@ export function ClubOnboardingScreen({ verification = false }: { verification?: 
   } else if (view === 'club') {
     body = <View className="gap-[12px]">
       {notice}
-      <Field label="Nombre del club" required error={state.clubError}>{input('clubName', { value: clubName, onChangeText: setClubName, maxLength: 120, error: !!state.clubError, accessibilityLabel: 'Nombre del club, obligatorio' })}</Field>
+      <Field label="Nombre del club" required error={state.clubError}>{input('clubName', { value: clubName, onChangeText: (value: string) => { setClubName(value); flow.clearClubError() }, maxLength: 120, error: !!state.clubError, accessibilityLabel: 'Nombre del club, obligatorio' })}</Field>
       <RegistrationLocationFields wizard model={clubGeo.model} state={clubGeo.state} disabled={working} legacy={state.club?.legacyText ?? null} />
     </View>
     footer = primary('Crear club', () => {
@@ -252,14 +258,14 @@ export function ClubOnboardingScreen({ verification = false }: { verification?: 
     body = <View className="gap-[12px]">
       {notice}
       <Text className="font-inter-600 text-[14px] leading-[20px] text-[#120F18]">Primera sede</Text>
-      <Field label="Nombre de la sede" required error={errors.name}>{input('venueName', { value: venueName, onChangeText: setVenueName, maxLength: 120, error: !!errors.name, accessibilityLabel: 'Nombre de la sede, obligatorio' })}</Field>
+      <Field label="Nombre de la sede" required error={errors.name}>{input('venueName', { value: venueName, onChangeText: (value: string) => { setVenueName(value); flow.clearVenueError('name') }, maxLength: 120, error: !!errors.name, accessibilityLabel: 'Nombre de la sede, obligatorio' })}</Field>
       <RegistrationLocationFields wizard model={venueGeo.model} state={venueGeo.state} disabled={working} />
       <View className="mt-[8px] flex-row items-center justify-between"><Text className="font-inter-600 text-[14px] leading-[20px] text-[#120F18]">Canchas</Text>
-        <Button variant="ghost" disabled={working} accessibilityLabel="Agregar cancha" onPress={() => setCourts(current => [...current, newCourt()])} className="h-[44px]"><Text className="font-inter-500 text-[14px] text-[#120F18]">+ Agregar cancha</Text></Button></View>
+        <Button variant="ghost" disabled={working} accessibilityLabel="Agregar cancha" onPress={() => { setCourts(current => [...current, newCourt()]); flow.clearVenueError('courts') }} className="h-[44px]"><Text className="font-inter-500 text-[14px] text-[#120F18]">+ Agregar cancha</Text></Button></View>
       {errors.courts ? <Text accessibilityRole="alert" className="font-inter-500 text-[14px] leading-[20px] text-[#AA3030]">{errors.courts}</Text> : null}
       {courts.map((court, index) => <Field key={court.key} label={`Cancha ${index + 1}`} required error={errors.courtNames[court.key]}>
         <View className="flex-row items-center gap-[8px]">
-          <View className="min-w-0 flex-1">{input(court.key, { value: court.name, onChangeText: value => setCourts(current => current.map(item => item.key === court.key ? { ...item, name: value } : item)), placeholder: `Cancha ${index + 1}`, maxLength: 80, error: !!errors.courtNames[court.key], accessibilityLabel: `Nombre de la cancha ${index + 1}, obligatorio` })}</View>
+          <View className="min-w-0 flex-1">{input(court.key, { value: court.name, onChangeText: value => { setCourts(current => current.map(item => item.key === court.key ? { ...item, name: value } : item)); flow.clearVenueError({ court: court.key }) }, placeholder: `Cancha ${index + 1}`, maxLength: 80, error: !!errors.courtNames[court.key], accessibilityLabel: `Nombre de la cancha ${index + 1}, obligatorio` })}</View>
           {courts.length > 1 ? <Pressable disabled={working} accessibilityRole="button" accessibilityLabel={`Quitar cancha ${index + 1}`} onPress={() => setCourts(current => current.filter(item => item.key !== court.key))} className="h-[48px] w-[48px] items-center justify-center"><Text className="font-inter-600 text-[20px] text-[#605E64]">×</Text></Pressable> : null}
         </View>
       </Field>)}
@@ -278,7 +284,7 @@ export function ClubOnboardingScreen({ verification = false }: { verification?: 
   const firstError = useMemo(() => Object.values(state.accountErrors)[0] ?? state.clubError ?? state.venueErrors.name ?? state.venueErrors.courts ?? Object.values(state.venueErrors.courtNames)[0] ?? null, [state.accountErrors, state.clubError, state.venueErrors])
   useEffect(() => { if (firstError) AccessibilityInfo.announceForAccessibility(firstError) }, [firstError])
 
-  return <Shell>
+  return <Shell avoidKeyboard>
     <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={false} scrollEventThrottle={16}
       onScroll={event => { scrollOffset.current = event.nativeEvent.contentOffset.y }} contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 16, paddingTop: 24, paddingBottom: 24, gap: 16 }}>
       <View className="gap-[8px]">
@@ -288,7 +294,7 @@ export function ClubOnboardingScreen({ verification = false }: { verification?: 
       </View>
       {body}
     </ScrollView>
-    {footer ? <View className="gap-[8px] border-t border-[#E7E7E8] px-[16px] pb-[24px] pt-[16px]">
+    {footer ? <View className={`gap-[8px] px-[16px] pb-[24px] pt-[16px] ${['account', 'club', 'plan', 'venue'].includes(view) ? 'border-t border-[#E7E7E8]' : ''}`}>
       {footerNote ? <Text className="font-inter-500 text-[14px] leading-[20px] text-[#605E64]">{footerNote}</Text> : null}
       {footer}
     </View> : null}

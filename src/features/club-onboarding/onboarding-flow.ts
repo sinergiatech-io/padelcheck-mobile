@@ -235,6 +235,21 @@ export class ClubOnboardingFlow {
     })
   }
 
+  /** Editing a field drops its own stale error; the others stay until the next attempt. */
+  clearAccountError(key: keyof AccountErrors) {
+    if (!this.state.accountErrors[key]) return
+    const { [key]: _removed, ...rest } = this.state.accountErrors
+    this.set({ accountErrors: rest })
+  }
+  clearClubError() { if (this.state.clubError) this.set({ clubError: null }) }
+  clearVenueError(field: 'name' | 'courts' | { court: string }) {
+    const current = this.state.venueErrors
+    if (typeof field === 'object') {
+      if (!current.courtNames[field.court]) return
+      const { [field.court]: _removed, ...courtNames } = current.courtNames
+      this.set({ venueErrors: { ...current, courtNames } })
+    } else if (current[field]) this.set({ venueErrors: { ...current, [field]: undefined } })
+  }
   selectPlan(plan: PlanCode) { if (!this.locked) this.set({ plan, notice: null }) }
 
   /** FREE records the choice and moves on; PRO/ELITE additionally opens the provider link. */

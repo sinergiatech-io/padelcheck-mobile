@@ -146,7 +146,8 @@ export interface VerifyProof { sessionId: string; email: string; token: string }
 /** Reads the deep-link query. Anything missing means an invalid link, never a guess. */
 export function readProof(params: { sessionId?: string | string[]; email?: string | string[]; token?: string | string[] }): VerifyProof | null {
   const one = (value: string | string[] | undefined) => Array.isArray(value) ? (value.length === 1 ? value[0] : '') : value ?? ''
-  const proof = { sessionId: one(params.sessionId).trim(), email: one(params.email).trim(), token: one(params.token).trim() }
+  // A + in the query reaches the router as a space (double decoding); a space is never valid in an email.
+  const proof = { sessionId: one(params.sessionId).trim(), email: one(params.email).trim().replace(/ /g, '+'), token: one(params.token).trim() }
   return proof.sessionId && proof.email && proof.token ? proof : null
 }
 
