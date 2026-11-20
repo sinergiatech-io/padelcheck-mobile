@@ -28,6 +28,7 @@ export function GoogleEntry({ intent, returnPath, disabled = false }: {
   const [error, setError] = useState(false)
   const [openJourney, setOpenJourney] = useState(false)
   const credential = useRef<string | undefined>(undefined)
+  const backToReview = useRef<(() => void) | undefined>(undefined)
   const active = useRef(false)
   const mounted = useRef(true)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
@@ -67,21 +68,25 @@ export function GoogleEntry({ intent, returnPath, disabled = false }: {
       </>}
     </Pressable>
     {error && <Banner title="No pudimos abrir Google" detail="Volvé a tocar el botón para reintentar." />}
-    {openJourney && <Modal visible animationType="none" onRequestClose={() => setOpenJourney(false)}>
+    {openJourney && <Modal visible animationType="none" onRequestClose={() => {
+      if (backToReview.current) backToReview.current()
+      else setOpenJourney(false)
+    }}>
       <GoogleJourney takeCredential={() => {
         const token = credential.current
         credential.current = undefined
         return token
-      }} intent={intent} returnPath={returnPath} close={() => setOpenJourney(false)} />
+      }} intent={intent} returnPath={returnPath} close={() => setOpenJourney(false)} backToReview={backToReview} />
     </Modal>}
   </View>
 }
 
 type Action = { label: string; run: () => void }
 
-export function GoogleJourney({ takeCredential, emailProof, intent, returnPath, close, addActivity }: {
+export function GoogleJourney({ takeCredential, emailProof, intent, returnPath, close, addActivity, backToReview }: {
   takeCredential?: () => string | undefined; emailProof?: string; intent?: AccessActivity; returnPath?: string | null
   close: () => void; addActivity?: AccessActivity
+  backToReview?: { current: (() => void) | undefined }
 }) {
   const { login, entryPath } = useAuth()
   const [response, setResponse] = useState<GoogleAuthResponse>()
@@ -90,6 +95,7 @@ export function GoogleJourney({ takeCredential, emailProof, intent, returnPath, 
   const [success, setSuccess] = useState<string>()
   const [gender, setGender] = useState<'MALE' | 'FEMALE'>()
   const [category, setCategory] = useState<string>()
+  const [showPlayerFields, setShowPlayerFields] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [catalogError, setCatalogError] = useState(false)
   const active = useRef<AbortController | undefined>(undefined)
@@ -97,7 +103,15 @@ export function GoogleJourney({ takeCredential, emailProof, intent, returnPath, 
   const resultGeneration = useRef<number | undefined>(undefined)
   const lastEmailProof = useRef<string | undefined>(undefined)
   const continuation = !success && response?.outcome === 'CONTINUATION' ? response.continuation : undefined
+  const profile = continuation?.purpose === 'COMPLETE_PLAYER_PROFILE' ? continuation : undefined
+  const reviewProfile = !!profile && !showPlayerFields
+  const playerName = [profile?.progress.givenName, profile?.progress.familyName].filter(Boolean).join(' ')
   useEffect(() => () => active.current?.abort(), [])
+  useEffect(() => {
+    if (!backToReview || !profile || !showPlayerFields) return
+    backToReview.current = () => { if (!busy) setShowPlayerFields(false) }
+    return () => { backToReview.current = undefined }
+  }, [backToReview, busy, profile, showPlayerFields])
 
   const proceed = async (result: GoogleAuthResponse) => {
     if (resultGeneration.current !== currentSessionGeneration()) {
@@ -180,7 +194,7 @@ export function GoogleJourney({ takeCredential, emailProof, intent, returnPath, 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [emailProof])
 
-  const needsCatalog = addActivity === 'PLAYER' || continuation?.purpose === 'COMPLETE_PLAYER_PROFILE' && !continuation?.progress.baseCategoryId
+  const needsCatalog = addActivity === 'PLAYER' || !!profile && showPlayerFields && !profile.progress.baseCategoryId
   const [catalogAttempt, setCatalogAttempt] = useState(0)
   useEffect(() => {
     if (!needsCatalog) return
@@ -221,11 +235,14 @@ export function GoogleJourney({ takeCredential, emailProof, intent, returnPath, 
   } else if (continuation?.purpose === 'SELECT_ACTIVITY') {
     title = 'Elegí tu perfil'
     detail = 'Seleccioná la opción que mejor te represente'
-  } else if (continuation?.purpose === 'COMPLETE_PLAYER_PROFILE') {
-    title = 'Completá tu perfil'
-    detail = 'Completá los datos que faltan para empezar a jugar.'
-    const selectedGender = continuation.progress.gender || gender
-    const categoryId = continuation.progress.baseCategoryId || category
+  } else if (reviewProfile) {
+    title = 'Completá tu perfil de jugador'
+    detail = 'Faltan tus datos deportivos para completar el registro.'
+    action = { label: 'Completar datos deportivos', run: () => setShowPlayerFields(true) }
+  } else if (profile) {
+    title = 'Completá tus datos deportivos'
+    const selectedGender = profile.progress.gender || gender
+    const categoryId = profile.progress.baseCategoryId || category
     if (selectedGender && categoryId) action = { label: 'Continuar', run: () =>
       resolve({ action: 'COMPLETE_PLAYER_PROFILE', gender: selectedGender, baseCategoryId: categoryId }) }
   }
@@ -234,7 +251,11 @@ export function GoogleJourney({ takeCredential, emailProof, intent, returnPath, 
     <Text accessibilityRole="header" className="font-inter-600 text-2xl text-[#120F18]">{title}</Text>
     {detail && <Text className="mt-4 font-sans text-base leading-6 text-[#605E64]">{detail}</Text>}
     {!!error && <View className="mt-4"><Banner title="No pudimos continuar" detail={error} /></View>}
-    {continuation?.progress.emailHint && <View className="mt-5"><Banner
+    {reviewProfile && <>
+      <View className="mt-5"><Banner title="Identidad confirmada" detail={profile.progress.emailHint ?? ''} tone="success" /></View>
+      <Text className="mt-5 font-sans text-base leading-6 text-[#605E64]">Usamos únicamente tus datos guardados. Revisá tu nombre, rama y categoría en el siguiente paso.</Text>
+    </>}
+    {!profile && continuation?.progress.emailHint && <View className="mt-5"><Banner
       title={continuation.purpose === 'LINK_GOOGLE_ACCOUNT' ? 'Mismo email acreditado' : 'Un paso para cuidar tu cuenta'}
       detail={continuation.progress.emailHint} tone="info" /></View>}
     {continuation?.purpose === 'SELECT_ACTIVITY' && <View className="mt-8 gap-4">
@@ -247,7 +268,11 @@ export function GoogleJourney({ takeCredential, emailProof, intent, returnPath, 
           <View className="flex-1 gap-1"><Text className="font-inter-600 text-base">{item.title}</Text><Text className="font-sans text-sm text-[#605E64]">{item.copy}</Text></View>
         </Pressable>)}
     </View>}
-    {(continuation?.purpose === 'COMPLETE_PLAYER_PROFILE' || addActivity === 'PLAYER') && <View className="mt-6 gap-4">
+    {(profile && showPlayerFields || addActivity === 'PLAYER') && <View className="mt-6 gap-4">
+      {!!playerName && <View className="gap-1 rounded-lg border border-[#E7E7E8] bg-[#F7F7F7] p-3">
+        <Text className="font-inter-500 text-sm text-[#605E64]">Nombre y apellido</Text>
+        <Text className="font-inter-500 text-base text-[#120F18]">{playerName}</Text>
+      </View>}
       {!continuation?.progress.gender && <View className="gap-2">
         <Text accessible={false} className="font-inter-500 text-sm leading-5 text-[#120F18]">Sexo <Text className="text-[#EF4444]">*</Text></Text>
         <SearchPicker accessibilityLabel="Sexo, obligatorio" title="Sexo" searchPlaceholder="Buscar" placeholder="Seleccioná tu sexo"
@@ -264,7 +289,9 @@ export function GoogleJourney({ takeCredential, emailProof, intent, returnPath, 
     </View>}
     <View className="mt-auto gap-2 pt-8">
       {action && <Button loading={busy} disabled={busy} onPress={action.run} className="h-12 rounded-lg"><Text className="font-inter-500">{action.label}</Text></Button>}
-      <Button variant="secondary" onPress={close} className="h-12 rounded-lg"><Text className="font-inter-500">Volver al acceso</Text></Button>
+      <Button variant="secondary" disabled={!!profile && busy} onPress={profile && showPlayerFields ? () => setShowPlayerFields(false) : close} className="h-12 rounded-lg">
+        <Text className="font-inter-500">{profile ? 'Volver' : 'Volver al acceso'}</Text>
+      </Button>
     </View>
   </ScrollView></Shell>
 }
