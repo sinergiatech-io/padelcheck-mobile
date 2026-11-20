@@ -248,11 +248,17 @@ export function GoogleJourney({ takeCredential, emailProof, intent, returnPath, 
         </Pressable>)}
     </View>}
     {(continuation?.purpose === 'COMPLETE_PLAYER_PROFILE' || addActivity === 'PLAYER') && <View className="mt-6 gap-4">
-      {!continuation?.progress.gender && <SearchPicker accessibilityLabel="Sexo" title="Sexo" searchPlaceholder="Buscar" placeholder="Seleccioná tu sexo"
-        value={gender} options={[{ id: 'MALE', name: 'Caballeros' }, { id: 'FEMALE', name: 'Damas' }]}
-        onSelect={id => { if (id === 'MALE' || id === 'FEMALE') setGender(id) }} disabled={busy} />}
-      {!continuation?.progress.baseCategoryId && <SearchPicker accessibilityLabel="Categoría" title="Categoría" searchPlaceholder="Buscar categoría" placeholder="Seleccioná tu categoría"
-        value={category} options={categories} onSelect={setCategory} disabled={busy || !categories.length} />}
+      {!continuation?.progress.gender && <View className="gap-2">
+        <Text accessible={false} className="font-inter-500 text-sm leading-5 text-[#120F18]">Sexo <Text className="text-[#EF4444]">*</Text></Text>
+        <SearchPicker accessibilityLabel="Sexo, obligatorio" title="Sexo" searchPlaceholder="Buscar" placeholder="Seleccioná tu sexo"
+          value={gender} options={[{ id: 'MALE', name: 'Caballeros' }, { id: 'FEMALE', name: 'Damas' }]}
+          onSelect={id => { if (id === 'MALE' || id === 'FEMALE') setGender(id) }} disabled={busy} />
+      </View>}
+      {!continuation?.progress.baseCategoryId && <View className="gap-2">
+        <Text accessible={false} className="font-inter-500 text-sm leading-5 text-[#120F18]">Categoría <Text className="text-[#EF4444]">*</Text></Text>
+        <SearchPicker accessibilityLabel="Categoría, obligatorio" title="Categoría" searchPlaceholder="Buscar categoría" placeholder="Seleccioná tu categoría"
+          value={category} options={categories} onSelect={setCategory} disabled={busy || !categories.length} />
+      </View>}
       {catalogError && <Pressable accessibilityRole="button" onPress={() => { setCatalogError(false); setCatalogAttempt(value => value + 1) }}>
         <Text className="py-3 underline">Reintentar la carga de categorías</Text></Pressable>}
     </View>}
