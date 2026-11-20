@@ -78,3 +78,25 @@ test('player guards keep the player shell and send the club root back', () => {
   assert.equal(guardRedirect('web', { kind: 'player' }, '/app'), '/app/events')
   assert.equal(guardRedirect('web', { kind: 'continue', reason: 'unavailable' }, '/app/events'), '/auth/continue')
 })
+
+test('account entry prioritizes a registered authorized return over saved activity', () => {
+  const { accessChoices, accountEntry } = require(process.env.SESSION_TEST_MODULE)
+  const contexts = [{ activity: 'PLAYER', playerId: 'p1' },
+    { activity: 'CLUB', clubId: 'c1', membershipId: 'm1', initialSetupStatus: 'COMPLETED' }]
+  const [player, club] = accessChoices(contexts)
+  assert.equal(accountEntry('web', contexts, '/app/events/event-1?name=extra', club.key).choice.key, player.key)
+  assert.equal(accountEntry('web', contexts, '/app/events/event-1?name=extra', club.key).path, '/app/events/event-1')
+  assert.equal(accountEntry('native', contexts, '/events/event-1', club.key).choice.key, player.key)
+  assert.equal(accountEntry('web', contexts, '//outside.invalid', club.key).path, '/app')
+})
+
+test('account entry drops revoked context and unsupported routes', () => {
+  const { accessChoices, accountEntry } = require(process.env.SESSION_TEST_MODULE)
+  const player = { activity: 'PLAYER', playerId: 'p1' }
+  const club = { activity: 'CLUB', clubId: 'c1', membershipId: 'm1', initialSetupStatus: 'COMPLETED' }
+  const saved = accessChoices([player, club])[1].key
+  const entry = accountEntry('web', [player], '/club/settings', saved)
+  assert.equal(entry.choice, undefined)
+  assert.equal(entry.path, '/app/events')
+  assert.equal(accountEntry('web', [player, club], '/not-a-route', null).path, '/auth/continue')
+})

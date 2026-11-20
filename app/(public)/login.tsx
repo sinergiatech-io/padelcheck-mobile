@@ -21,7 +21,7 @@ import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
 import { consumeLoginNotice } from '@/features/auth/login-notice'
 import { login as loginRequest } from '@/features/auth/api/login'
-import { acceptedReturnPath, resolveAccessDestination } from '@/features/auth/access-destination'
+import { acceptedReturnPath } from '@/features/auth/access-destination'
 import { AUTH_COPY, loginErrorMessage, type LoginNotice } from '@/features/auth/auth-copy'
 import {
   alertBlockedXml,
@@ -31,13 +31,12 @@ import {
   courtXml,
   eyeOnXml,
   eyeXml,
-  googleLabelXml,
   personXml,
 } from '@/features/auth/auth-icons'
+import { GoogleEntry } from '@/features/auth/GoogleJourney'
 import { SessionUnverified } from '@/features/auth/SessionUnverified'
 
 const logo = require('../../assets/auth/logo.png')
-const googleMark = require('../../assets/auth/google-g.png')
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -76,7 +75,7 @@ function LoginBanner({ tone, title, detail }: LoginNotice) {
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets()
-  const { login, phase, destination } = useAuth()
+  const { login, entryPath, phase, destination } = useAuth()
   const params = useLocalSearchParams<{ returnUrl?: string; notice?: string }>()
   const returnUrl = typeof params.returnUrl === 'string' ? params.returnUrl : null
   const [showPassword, setShowPassword] = useState(false)
@@ -105,8 +104,7 @@ export default function LoginScreen() {
       const data = await loginRequest(values)
       const accepted = await login(data.accessToken, data.context, data.expiresIn)
       if (!accepted) return
-      const resolved = resolveAccessDestination(data.context.accessContexts)
-      router.replace(acceptedReturnPath('native', resolved, returnUrl))
+      router.replace(entryPath(data.context, returnUrl))
     } catch (error) {
       setFormError(loginErrorMessage(error))
     } finally {
@@ -239,16 +237,7 @@ export default function LoginScreen() {
             <Text className="font-sans text-[16px] leading-[24px] text-[#605E64]">o</Text>
             <View className="h-px flex-1 bg-[#B6B5B7]" />
           </View>
-          <View
-            accessibilityRole="button"
-            accessibilityLabel="Continuar con Google"
-            className={`mt-[16px] h-[48px] flex-row items-center justify-center rounded-[8px] border border-[#747775] bg-white ${
-              Platform.OS === 'ios' ? 'gap-[12px] px-[16px]' : 'gap-[10px] px-[12px]'
-            }`}
-          >
-            <Image source={googleMark} style={{ width: 20, height: 20 }} resizeMode="contain" accessible={false} />
-            <SvgXml xml={googleLabelXml} width={142.674} height={13.496} />
-          </View>
+          <View className="mt-4"><GoogleEntry returnPath={returnUrl} disabled={submitting} /></View>
           <Text className="mt-[16px] font-sans text-[16px] leading-[24px] text-[#605E64]">¿No tenés cuenta? Registrate como</Text>
           <View className="mt-[16px] flex-row gap-[12px]">
             <Pressable

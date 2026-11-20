@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ElementRef } from 'react'
+import { GoogleEntry } from './GoogleJourney'
 import { router, useLocalSearchParams } from 'expo-router'
 import { AccessibilityInfo, findNodeHandle, Keyboard, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { SvgXml } from 'react-native-svg'
@@ -81,6 +82,7 @@ export function PlayerRegisterScreen({ verification = false }: { verification?: 
   }
   return <Shell><ScrollView ref={scroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={false} onScroll={(event) => { scrollOffset.current = event.nativeEvent.contentOffset.y }} scrollEventThrottle={16} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 24, paddingBottom: 32, gap: 16 }}>
     {heading('Creá tu cuenta de jugador', 'Completá tus datos y elegí tu categoría para empezar.')}
+    <GoogleEntry intent="PLAYER" disabled={busy} />
     {notice && <Banner title={notice} detail="Intentá de nuevo." />}
     <View className="gap-[12px]">{(['firstName', 'lastName', 'email', 'password', 'gender', 'baseCategoryId'] as const).map(key => {
       const label = { firstName: 'Nombre', lastName: 'Apellido', email: 'Email', password: 'Contraseña', gender: 'Sexo', baseCategoryId: 'Categoría' }[key]
