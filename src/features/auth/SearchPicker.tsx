@@ -33,6 +33,7 @@ export function SearchPicker({ title, placeholder, searchPlaceholder, options, v
   const [query, setQuery] = useState('')
   const [keyboard, setKeyboard] = useState(0)
   const visible = useMemo(() => filterOptions(options, query), [options, query])
+  const selectedLabel = valueLabel ?? options.find(option => option.id === value)?.name
   useEffect(() => {
     if (!open) return
     const show = Keyboard.addListener('keyboardDidShow', event => setKeyboard(event.endCoordinates.height))
@@ -41,10 +42,11 @@ export function SearchPicker({ title, placeholder, searchPlaceholder, options, v
   }, [open])
   const close = () => { setOpen(false); setQuery('') }
   return <>
-    <Pressable disabled={disabled} accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{ disabled: !!disabled }} style={style}
+    <Pressable disabled={disabled} accessibilityRole="button" accessibilityLabel={accessibilityLabel}
+      accessibilityValue={selectedLabel ? { text: selectedLabel } : undefined} accessibilityState={{ disabled: !!disabled }} style={style}
       onPress={() => { Keyboard.dismiss(); setOpen(true) }}
       className={`h-[56px] flex-row items-center justify-between rounded-[8px] border bg-[#FEFEFE] px-[16px] ${invalid ? 'border-[#EF4444]' : 'border-[#929195]'}`}>
-      <Text numberOfLines={1} className={`min-w-0 flex-1 font-inter-500 text-[14px] leading-[20px] ${valueLabel ? 'text-[#120F18]' : 'text-[#605E64]'}`}>{valueLabel ?? placeholder}</Text>
+      <Text numberOfLines={1} className={`min-w-0 flex-1 font-inter-500 text-[14px] leading-[20px] ${selectedLabel ? 'text-[#120F18]' : 'text-[#605E64]'}`}>{selectedLabel ?? placeholder}</Text>
       <SvgXml xml={chevronXml} />
     </Pressable>
     <Modal visible={open} transparent animationType="slide" onRequestClose={close} statusBarTranslucent navigationBarTranslucent>

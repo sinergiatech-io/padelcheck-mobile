@@ -36,6 +36,7 @@ export default function DashboardScreen() {
           </Text>
         </CardContent>
       </Card>
+      <Button variant="ghost" className="self-start" onPress={() => router.push({ pathname: "/auth-continue", params: { account: "1" } })}>Mi cuenta</Button>
       <Button
         variant="secondary"
         className="self-start"

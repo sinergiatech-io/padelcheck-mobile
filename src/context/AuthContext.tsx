@@ -1,3 +1,4 @@
+import * as PreferredStore from 'expo-secure-store'
 import {
   createContext,
   useCallback,
@@ -11,7 +12,7 @@ import {
 import { AppState } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
 import { fetchCurrentUser } from '@/features/auth/api/me'
-import { resolveAccessDestination, type AccessDestination } from '@/features/auth/access-destination'
+import { accessChoices, accountEntry, resolveAccessDestination, type AccessDestination } from '@/features/auth/access-destination'
 import { rememberExpiredLoginNotice } from '@/features/auth/login-notice'
 import { decideSessionCheck } from '@/features/auth/session-check'
 import { bumpSessionGeneration, currentSessionGeneration } from '@/features/auth/session-generation'
@@ -19,6 +20,7 @@ import { ApiError } from '@/lib/api-client'
 import { clearStoredToken, getStoredToken, setStoredToken } from '@/lib/auth'
 import { clearBillingAttempt } from '@/features/club/plan/billing-attempt'
 import { setHttpErrorListener } from '@/lib/http-client'
+import { clearGoogleClubDraft } from '@/features/club-onboarding/google-club-draft'
 import { queryClient } from '@/lib/query-client'
 import { StorageUnavailableError, withStorageDeadline } from '@/lib/storage-deadline'
 import type { AuthPrincipal } from '@/types/auth'
@@ -40,9 +42,21 @@ interface AuthContextValue extends AuthState {
   isAuthenticated: boolean
   isLoading: boolean
   destination: AccessDestination | null
+  chooseContext: (key: string) => boolean
+  entryPath: (user: AuthPrincipal, requested?: string | null) => string
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
+
+function preferredKey(userId: string) { return 'padelcheck.activity.' + userId }
+
+function readPreferred(userId: string) {
+  try { return PreferredStore.getItem(preferredKey(userId)) } catch { return null }
+}
+
+function writePreferred(userId: string, key: string) {
+  try { PreferredStore.setItem(preferredKey(userId), key) } catch { /* The in-memory preference is still available. */ }
+}
 
 const USER_KEY = 'padelcheck_user'
 const EXPIRES_KEY = 'padelcheck_session_expires_at'
@@ -56,6 +70,7 @@ async function readExpires(): Promise<number | null> {
 }
 
 async function clearPrivateSession() {
+  await clearGoogleClubDraft()
   queryClient.clear()
   const results = await Promise.allSettled([
     clearStoredToken(),
@@ -210,7 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setHttpErrorListener((error) => {
       if (error.kind !== 'http') return
       const path = errorPath(error)
-      if (path.includes('/auth/login')) return
+      if (path.includes('/auth/login') || path.includes('/auth/google') || path.includes('/auth/continuations/')) return
       if (error.status === 401 && error.code !== 'AUTH_INVALID_CREDENTIALS') {
         if (stateRef.current.phase === 'anonymous') return
         void logout('expired')
@@ -226,9 +241,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => setHttpErrorListener(null)
   }, [logout, validate])
 
-  const destination = state.phase === 'ready' && state.user
-    ? resolveAccessDestination(state.user.accessContexts)
-    : null
+  const [preferred, setPreferred] = useState<{ userId: string; key: string }>()
+  const preferredFor = useCallback((userId: string) =>
+    preferred?.userId === userId ? preferred.key : readPreferred(userId), [preferred])
+  const entryPath = useCallback((user: AuthPrincipal, requested?: string | null) => {
+    const entry = accountEntry('native', user.accessContexts, requested, preferredFor(user.userId))
+    if (entry.choice) {
+      writePreferred(user.userId, entry.choice.key)
+      setPreferred({ userId: user.userId, key: entry.choice.key })
+    }
+    return entry.path
+  }, [preferredFor])
+  const chooseContext = useCallback((key: string) => {
+    const user = stateRef.current.phase === 'ready' ? stateRef.current.user : null
+    if (!user || !accessChoices(user.accessContexts).some(item => item.key === key)) return false
+    writePreferred(user.userId, key)
+    setPreferred({ userId: user.userId, key })
+    return true
+  }, [])
+  const user = state.phase === 'ready' ? state.user : null
+  const chosen = user ? accessChoices(user.accessContexts).find(item => item.key === preferredFor(user.userId)) : undefined
+  const destination = user ? chosen?.destination ?? resolveAccessDestination(user.accessContexts) : null
 
   const value = useMemo<AuthContextValue>(() => ({
     ...state,
@@ -239,7 +272,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: state.phase === 'ready' && !!state.token && !!state.user,
     isLoading: state.phase === 'checking',
     destination,
-  }), [destination, login, logout, retryValidation, state, storageError])
+    chooseContext,
+    entryPath,
+  }), [chooseContext, destination, entryPath, login, logout, retryValidation, state, storageError])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

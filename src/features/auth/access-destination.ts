@@ -155,3 +155,60 @@ export function guardRedirect(
     || path === '/club/plan' || path.startsWith('/club/plan/')
   return path === clubRoot || clubSettings || platform === 'native' && path === '/club' ? null : clubRoot
 }
+
+export interface AccessChoice {
+  key: string
+  activity: AccessActivity
+  destination: AccessDestination
+}
+
+export function accessChoices(contexts: unknown): AccessChoice[] {
+  if (!Array.isArray(contexts)) return []
+  const valid = contexts.map(asContext)
+  if (valid.some(entry => entry === null)) return []
+  return valid.flatMap((entry): AccessChoice[] => {
+    if (!entry) return []
+    if (entry.activity === 'PLAYER' && entry.playerId) {
+      return [{ key: 'PLAYER:' + entry.playerId, activity: 'PLAYER', destination: { kind: 'player' } }]
+    }
+    if (!entry.clubId) return []
+    return [{
+      key: 'CLUB:' + entry.clubId + ':' + (entry.membershipId ?? ''),
+      activity: 'CLUB',
+      destination: entry.initialSetupStatus === 'PENDING'
+        ? { kind: 'continue', reason: 'pending-setup' }
+        : { kind: 'club', clubId: entry.clubId },
+    }]
+  })
+}
+
+function registeredPath(platform: AccessPlatform, candidate: string) {
+  if (platform === 'web') {
+    if (/^\/app\/events\/[\w-]+(?:\/categories\/[\w-]+(?:\/(?:enroll|inscripciones|clasificatoria|cuadros|resultados))?)?$/.test(candidate)) return true
+    return ['/app/events', '/app/events/location', '/app', '/app/my-tournaments', '/club/plan',
+      '/club/settings', '/club/settings/info', '/club/settings/info/preview', '/club/settings/tournaments',
+      '/club/settings/categories', '/club/settings/venues'].includes(candidate)
+  }
+  if (/^\/events\/[\w-]+(?:\/categories\/[\w-]+(?:\/(?:enroll|inscripciones|clasificatoria|cuadros|resultados))?)?$/.test(candidate)) return true
+  return ['/events', '/dashboard', '/my-tournaments', '/players', '/settings', '/club', '/club/plan',
+    '/club/settings', '/club/settings/info', '/club/settings/tournaments', '/club/settings/categories',
+    '/club/settings/venues'].includes(candidate)
+}
+
+export function accountEntry(
+  platform: AccessPlatform,
+  contexts: unknown,
+  value: string | null | undefined,
+  savedKey: string | null,
+) {
+  const path = safeInternalPath(value)
+  const choices = accessChoices(contexts)
+  const requested = path && registeredPath(platform, path)
+    ? choices.filter(item => item.destination.kind !== 'continue'
+      && guardRedirect(platform, item.destination, path) === null)
+    : []
+  if (path && requested.length === 1) return { choice: requested[0], path }
+  const choice = choices.find(item => item.key === savedKey)
+  const destination = choice?.destination ?? resolveAccessDestination(contexts)
+  return { choice, path: destinationPath(platform, destination) }
+}

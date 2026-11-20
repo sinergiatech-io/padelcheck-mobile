@@ -6,6 +6,7 @@ import { API_BASE } from '@/lib/constants'
 import { getStoredToken } from '@/lib/auth'
 import { withStorageDeadline } from '@/lib/storage-deadline'
 import { ClubOnboardingFlow, type OnboardingApi, type SessionStore } from './onboarding-flow'
+import { clearGoogleClubDraft, readGoogleClubDraft } from './google-club-draft'
 import { SESSION_KEY, parseSavedSession, serializeSession, type Platform } from './onboarding-model'
 
 const options = { timeoutMs: 20000 }
@@ -25,8 +26,29 @@ export const onboardingStore: SessionStore = {
 }
 export const nativePlatform: Platform = NativePlatform.OS === 'ios' ? 'IOS' : 'ANDROID'
 
-export function useClubOnboarding() {
-  const [flow] = useState(() => new ClubOnboardingFlow({ api: onboardingApi, store: onboardingStore, platform: nativePlatform, openUrl: url => Linking.openURL(url) }))
+export function useClubOnboarding(allowGoogleDraft = true) {
+  const [flow] = useState(() => {
+    const draft = allowGoogleDraft ? readGoogleClubDraft() : Promise.resolve(null)
+    const api: OnboardingApi = {
+      ...onboardingApi,
+      async post<T>(path: string, body: unknown) {
+        const proof = await draft
+        return publicClient.post<T>(path, body, proof && path.startsWith('/onboarding/clubs/')
+          ? { ...options, headers: { 'X-Onboarding-Continuation': proof.token } } : options)
+      },
+      async get<T>(path: string) {
+        const proof = await draft
+        return publicClient.get<T>(path, proof && path.startsWith('/onboarding/clubs/')
+          ? { ...options, headers: { 'X-Onboarding-Continuation': proof.token } } : options)
+      },
+    }
+    const store: SessionStore = {
+      async load() { const proof = await draft; return proof ? { sessionId: proof.sessionId, email: "" } : onboardingStore.load() },
+      async save(session) { if (!await draft) await onboardingStore.save(session) },
+      async clear() { if (await draft) await clearGoogleClubDraft(); else await onboardingStore.clear() },
+    }
+    return new ClubOnboardingFlow({ api, store, platform: nativePlatform, openUrl: url => Linking.openURL(url) })
+  })
   const state = useSyncExternalStore(flow.subscribe, () => flow.state)
   return { flow, state }
 }

@@ -13,6 +13,7 @@ export default function SettingsScreen() {
       <View className="flex-1 gap-4 bg-background p-6">
         <Text className="font-inter-600 text-h2 text-dark-900">Perfil</Text>
         <Text className="font-sans text-body-sm text-dark-700">Perfil y configuración del jugador.</Text>
+        <Button variant="ghost" className="self-start" onPress={() => router.push({ pathname: "/auth-continue", params: { account: "1" } })}><Text>Mi cuenta</Text></Button>
         <Button
           variant="secondary"
           className="self-start"

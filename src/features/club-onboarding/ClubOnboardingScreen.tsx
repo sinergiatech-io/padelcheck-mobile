@@ -9,6 +9,7 @@ import { Banner, Shell, fieldClass, type BannerTone } from '@/features/auth/Regi
 import { RegistrationLocationFields } from '@/features/auth/RegistrationLocationFields'
 import { useRegistrationLocation } from '@/features/auth/use-registration-location'
 import type { PositionProvider } from '@/features/auth/registration-location'
+import { GoogleEntry } from '@/features/auth/GoogleJourney'
 import { useClubOnboarding } from './onboarding-client'
 import {
   PLAN_LINES, isPaid, planFooter, readProof, stepNumber,
@@ -61,7 +62,7 @@ function Field({ label, required, error, children }: { label: string; required?:
 export function ClubOnboardingScreen({ verification = false }: { verification?: boolean }) {
   const params = useLocalSearchParams<{ sessionId?: string; email?: string; token?: string }>()
   const auth = useAuth()
-  const { flow, state } = useClubOnboarding()
+  const { flow, state } = useClubOnboarding(!verification)
   const { view, busy } = state
   const [proof] = useState<VerifyProof | null>(() => verification ? readProof(params) : null)
   const hasBearer = auth.phase === 'ready' && !!auth.token && !!auth.user?.accessContexts?.some(context => context.activity === 'CLUB' && context.initialSetupStatus === 'PENDING')
@@ -174,7 +175,8 @@ export function ClubOnboardingScreen({ verification = false }: { verification?: 
     const errors = state.accountErrors
     body = <View className="gap-[12px]">
       {notice}
-      <Field label="Nombre" required error={errors.firstName}>{input('firstName', { value: account.firstName, onChangeText: value => setAccountField('firstName', value), placeholder: 'Tu nombre', autoComplete: 'given-name', maxLength: 100, error: !!errors.firstName, accessibilityLabel: 'Nombre, obligatorio' })}</Field>
+      <GoogleEntry intent="CLUB" disabled={working} />
+        <Field label="Nombre" required error={errors.firstName}>{input('firstName', { value: account.firstName, onChangeText: value => setAccountField('firstName', value), placeholder: 'Tu nombre', autoComplete: 'given-name', maxLength: 100, error: !!errors.firstName, accessibilityLabel: 'Nombre, obligatorio' })}</Field>
       <Field label="Apellido" required error={errors.lastName}>{input('lastName', { value: account.lastName, onChangeText: value => setAccountField('lastName', value), placeholder: 'Tu apellido', autoComplete: 'family-name', maxLength: 100, error: !!errors.lastName, accessibilityLabel: 'Apellido, obligatorio' })}</Field>
       <Field label="Email" required error={errors.email}>{input('email', { value: account.email, onChangeText: value => setAccountField('email', value), placeholder: 'nombre@correo.com', autoCapitalize: 'none', autoComplete: 'email', keyboardType: 'email-address', maxLength: 255, error: !!errors.email, accessibilityLabel: 'Email, obligatorio' })}</Field>
       <Field label="Contraseña" required error={errors.password}>

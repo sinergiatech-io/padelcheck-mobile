@@ -27,6 +27,7 @@ export interface AuthPrincipal {
   firstName: string
   lastName: string
   platformRole: string
+  hasLocalPassword?: boolean
   hasPlayerProfile: boolean
   playerId: string | null
   clubMemberships: ClubMembershipSummary[]

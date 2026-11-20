@@ -21,7 +21,7 @@ export function Banner({ title, detail, tone = 'error' }: { title: string; detai
  * `avoidKeyboard` (wizard with a fixed footer) lifts the surface above the keyboard on Android, where the edge-to-edge
  * window is not resized; iOS already uses the KeyboardAvoidingView padding. The player form keeps its previous behavior.
  */
-export function Shell({ children, avoidKeyboard = false }: { children: ReactNode; avoidKeyboard?: boolean }) {
+export function Shell({ children, avoidKeyboard = false, identity = false }: { children: ReactNode; avoidKeyboard?: boolean; identity?: boolean }) {
   const insets = useSafeAreaInsets()
   const [keyboard, setKeyboard] = useState(false)
   const [keyboardHeight, setKeyboardHeight] = useState(0)
@@ -32,9 +32,9 @@ export function Shell({ children, avoidKeyboard = false }: { children: ReactNode
   }, [])
   const lift = avoidKeyboard && Platform.OS === 'android' && keyboard ? keyboardHeight + insets.bottom : 0
   return <StartupReady><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1 bg-[#120F18]" style={{ paddingTop: insets.top }}>
-    <View style={{ height: keyboard ? 72 : 124, overflow: 'hidden' }}>
-      <SvgXml xml={courtXml} width="100%" height={172} />
-      <Image source={require('../../../assets/auth/logo.png')} accessibilityLabel="Padel Check" resizeMode="contain" style={{ position: 'absolute', top: keyboard ? 8 : 16, left: '50%', marginLeft: keyboard ? -28 : -46, width: keyboard ? 56 : 92, height: keyboard ? 55 : 91 }} />
+    <View style={{ height: keyboard ? 72 : identity ? 203 : 124, overflow: 'hidden' }}>
+      <SvgXml xml={courtXml} width="100%" height={identity ? 203 : 172} />
+      <Image source={require('../../../assets/auth/logo.png')} accessibilityLabel="Padel Check" resizeMode="contain" style={{ position: 'absolute', top: keyboard ? 8 : identity ? 47 : 16, left: '50%', marginLeft: keyboard ? -28 : identity ? -52 : -46, width: keyboard ? 56 : identity ? 104 : 92, height: keyboard ? 55 : identity ? 104 : 91 }} />
     </View>
     <View className="min-h-0 flex-1 overflow-hidden rounded-t-[24px] bg-[#FEFEFE]" style={{ paddingBottom: keyboard ? lift : insets.bottom }}>{children}</View>
   </KeyboardAvoidingView></StartupReady>
