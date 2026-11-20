@@ -253,12 +253,15 @@ function Profile({ clubId, playerId, accountId, linkedFromList }: {
           keyboardShouldPersistTaps="handled">{content}</ScrollView>}
       {footer && <View className="flex-row bg-[#f2f2f2] px-4 pb-6 pt-4" style={{ gap: 10 }}>
         {(view === 'confirm-category' || view === 'remove') && <Button variant="secondary" className={`${button} flex-1`} disabled={saving} onPress={back}>Cancelar</Button>}
-        <Button className={`${button} flex-1`} loading={saving} loadingLabel={`${saveText} en curso`}
+        <Button className={`${button} flex-1 ${saving ? 'bg-[#eef0c1] disabled:opacity-100' : ''}`}
+          loading={saving} loadingLabel={`${saveText} en curso`}
           disabled={(view === 'category' || view === 'confirm-category') && !flow.validCategory}
           onPress={() => view === 'category' ? open('confirm-category') : void flow.save()}>{view === 'category' ? 'Continuar' : saveText}</Button>
       </View>}
-      <ClubBottomNav selectedLabel="Jugadores" bottomInset={insets.bottom} busy={saving} onPlayers={returnToList}
-        onDashboard={() => router.replace('/dashboard')} onClub={() => router.replace('/club/settings')} />
+      <View style={{ opacity: saving ? 0.38 : 1 }}>
+        <ClubBottomNav selectedLabel="Jugadores" bottomInset={insets.bottom} busy={saving} onPlayers={returnToList}
+          onDashboard={() => router.replace('/dashboard')} onClub={() => router.replace('/club/settings')} />
+      </View>
     </View>
     <Modal visible={choosing} transparent animationType="none" onRequestClose={() => setChoosing(false)}>
       <View className="flex-1 justify-center bg-black/40 p-6">
