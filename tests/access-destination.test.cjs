@@ -9,10 +9,10 @@ const {
 
 const player = { activity: 'PLAYER', playerId: 'p1' }
 
-test('only club activity may reach the category policy editor on both platforms', () => {
+test('only club activity may reach club management routes on both platforms', () => {
   for (const platform of ['web', 'native']) {
     assert.equal(guardRedirect(platform, { kind: 'club', clubId: 'c1' }, '/club/settings/categories'), null)
-    for (const path of ['/club/settings', '/club/settings/venues', '/club/settings/venues/v1/courts/new', '/club/plan']) {
+    for (const path of ['/club/settings', '/club/settings/venues', '/club/settings/venues/v1/courts/new', '/club/plan', '/club/players/player-1']) {
       assert.equal(guardRedirect(platform, { kind: 'club', clubId: 'c1' }, path), null)
       assert.equal(guardRedirect(platform, { kind: 'player' }, path), platform === 'web' ? '/app/events' : '/events')
     }
