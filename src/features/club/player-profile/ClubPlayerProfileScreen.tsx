@@ -17,10 +17,10 @@ import { activityMonth, futureNotice, profileError, useClubPlayerProfile, type C
 const playedIcon = Image.resolveAssetSource(require('@/assets/player-profile/matches-played.svg'))?.uri
 const wonIcon = Image.resolveAssetSource(require('@/assets/player-profile/matches-won.svg'))?.uri
 const emptyActivityIcon = Image.resolveAssetSource(require('@/assets/player-profile/empty-activity.svg'))?.uri
-const body = 'font-inter-400 text-sm text-dark-900'
-const caption = 'font-inter-400 text-xs text-[#605e64]'
-const label = 'font-inter-600 text-sm text-dark-900'
-const button = 'h-12 rounded-lg'
+const body = 'font-inter-400 text-[14px] leading-[20px] text-dark-900'
+const caption = 'font-inter-400 text-[12px] leading-[16px] text-[#605e64]'
+const label = 'font-inter-600 text-[14px] leading-[20px] text-dark-900'
+const button = 'h-[48px] rounded-[8px]'
 const stack = { gap: 12 }
 
 function Notice({ children, error = false }: { children: ReactNode; error?: boolean }) {
@@ -38,7 +38,7 @@ function Identity({ player }: { player: ClubPlayerProfile }) {
       {player.profilePhotoUrl
         ? <Image accessible={false} style={{ width: 64, height: 64, borderRadius: 32 }} source={{ uri: player.profilePhotoUrl }} />
         : <View accessible={false} style={{ width: 64, height: 64, borderRadius: 32 }} className="items-center justify-center bg-primary-500">
-          <Text className="font-inter-700 text-2xl text-white">{initials}</Text>
+          <Text className="font-inter-700 text-[24px] leading-[32px] text-white">{initials}</Text>
         </View>}
       <View className="flex-1">
         <Text accessibilityRole="header" style={{ fontSize: 26, lineHeight: 32 }} className="font-inter-700 text-dark-900">{name}</Text>
@@ -143,7 +143,7 @@ function Profile({ clubId, playerId, accountId, linkedFromList }: {
             {player.observed && <Text className={`${caption} rounded-full bg-[#f8f8e9] px-3 py-1`}>Observado</Text>}
           </View>
           <View className="flex-row items-center" style={{ gap: 12 }}>
-            <Text className="font-inter-700 text-4xl text-dark-900">{player.effectiveCategory?.name ?? 'Sin categoría'}</Text>
+            <Text className="font-inter-700 text-[36px] leading-[44px] text-dark-900">{player.effectiveCategory?.name ?? 'Sin categoría'}</Text>
             <View>
               <Text className={label}>{player.gender === 'MALE' ? 'Caballeros' : player.gender === 'FEMALE' ? 'Damas' : ''}</Text>
               <Text className={caption}>{player.localCategory ? 'Categoría en este club' : 'Usa la categoría global'}</Text>
@@ -156,21 +156,21 @@ function Profile({ clubId, playerId, accountId, linkedFromList }: {
           </View> : <Notice>Tenés acceso de solo lectura.</Notice>}
           {player.observed && player.canManage && <View style={{ gap: 8 }} className="items-start">
             <Text className={caption}>Nota interna · Solo este club</Text>
-            <Text className="font-inter-400 text-sm text-[#605e64]">{player.observationNote ?? 'Sin nota interna'}</Text>
+            <Text className={`${body} text-[#605e64]`}>{player.observationNote ?? 'Sin nota interna'}</Text>
             <Button variant="ghost" className={button} onPress={() => open('remove')}>Quitar observación</Button>
           </View>}
         </View>
         <View style={{ padding: 20, gap: 12, borderRadius: 16 }} className="bg-dark-900">
-          <Text className="font-inter-600 text-sm text-white">Rendimiento en este club</Text>
+          <Text className="font-inter-600 text-[14px] leading-[20px] text-white">Rendimiento en este club</Text>
           <View className="flex-row" style={{ gap: 16 }}>
             {[{ icon: playedIcon, count: player.matchesPlayed, text: 'Partidos jugados' },
               { icon: wonIcon, count: player.matchesWon, text: 'Partidos ganados' }].map(stat =>
               <View key={stat.text} className="flex-1" style={{ gap: 4 }}>
                 <View className="flex-row items-center" style={{ gap: 6 }}>
                   {stat.icon && <SvgUri uri={stat.icon} width={20} height={20} />}
-                  <Text className="font-inter-600 text-4xl text-primary-500">{stat.count}</Text>
+                  <Text className="font-inter-600 text-[36px] leading-[44px] text-primary-500">{stat.count}</Text>
                 </View>
-                <Text className="font-inter-400 text-xs text-white">{stat.text}</Text>
+                <Text className="font-inter-400 text-[12px] leading-[16px] text-white">{stat.text}</Text>
               </View>)}
           </View>
         </View>
@@ -200,16 +200,19 @@ function Profile({ clubId, playerId, accountId, linkedFromList }: {
         {flow.history.hasNextPage && <Button variant="secondary" className={button} disabled={flow.history.isFetchingNextPage}
           onPress={() => void flow.history.fetchNextPage()}>Cargar más</Button>}
       </>}
-      {view !== 'profile' && view !== 'history' && <Text className="font-inter-400 text-xs text-dark-900">{player.clubName} · Categoría actual: {player.effectiveCategory?.name ?? 'Sin categoría'}</Text>}
+      {view !== 'profile' && view !== 'history' && <Text className="font-inter-400 text-[12px] leading-[16px] text-dark-900">{player.clubName} · Categoría actual: {player.effectiveCategory?.name ?? 'Sin categoría'}</Text>}
       {view === 'observe' && <View style={{ gap: 16, paddingTop: 4 }}>
-        <Text accessibilityRole="header" className="font-inter-600 text-lg text-dark-900">{player.observed ? 'Editá la nota de observación' : 'Observar para un posible ascenso'}</Text>
-        <Text className="font-inter-500 text-sm text-dark-900">Marcá al jugador mientras esperás un resultado deportivo. Su categoría no cambia.</Text>
+        <Text accessibilityRole="header" className="font-inter-600 text-[18px] leading-[26px] text-dark-900">{player.observed ? 'Editá la nota de observación' : 'Observar para un posible ascenso'}</Text>
+        <Text className="font-inter-500 text-[14px] leading-[20px] text-dark-900">Marcá al jugador mientras esperás un resultado deportivo. Su categoría no cambia.</Text>
         <Text className={label}>Nota interna (opcional)</Text>
-        <TextInput accessibilityLabel="Nota interna (opcional)" multiline editable={!saving} value={flow.note} onChangeText={flow.setNote}
-          placeholder="Agregá una nota si lo necesitás" placeholderTextColor="#605e64" textAlignVertical="top"
-          className={`${body} min-h-14 rounded-lg border border-[#929096] p-4 ${saving ? 'bg-[#f5f5f5]' : ''}`} />
+        <View style={{ paddingHorizontal: 16 }} className={`rounded-[8px] border border-[#929096] ${saving ? 'bg-[#f5f5f5]' : ''}`}>
+          <TextInput accessibilityLabel="Nota interna (opcional)" multiline editable={!saving} value={flow.note} onChangeText={flow.setNote}
+            placeholder="Agregá una nota si lo necesitás" placeholderTextColor="#605e64" textAlignVertical="top"
+            underlineColorAndroid="transparent" style={{ minHeight: 54, paddingHorizontal: 0, paddingVertical: 12 }}
+            className={body} />
+        </View>
         <Text className={caption}>Solo el administrador y el staff autorizados de este club pueden ver la nota.</Text>
-        <Text className="font-inter-400 text-xs text-dark-900">La marca será visible para el jugador.</Text>
+        <Text className="font-inter-400 text-[12px] leading-[16px] text-dark-900">La marca será visible para el jugador.</Text>
       </View>}
       {view === 'category' && <View style={stack}>
         <Text accessibilityRole="header" className="font-inter-700 text-xl text-dark-900">Elegí su nueva categoría</Text>
@@ -245,7 +248,7 @@ function Profile({ clubId, playerId, accountId, linkedFromList }: {
       <View style={{ height: 56, paddingHorizontal: 16 }} className="flex-row items-center bg-[#100e16]">
         <Pressable accessibilityRole="button" accessibilityLabel="Volver" disabled={saving} onPress={back}
           style={{ height: 44, width: 40, opacity: saving ? 0.4 : 1 }} className="items-center justify-center"><ArrowBackIcon /></Pressable>
-        <Text accessibilityRole="header" className="font-inter-700 text-xl text-white">{flow.title}</Text>
+        <Text accessibilityRole="header" className="font-inter-700 text-[20px] leading-[28px] text-white">{flow.title}</Text>
       </View>
       {view === 'profile' ? <RefreshableScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1, padding: 16, paddingTop: 20 }}
         alwaysBounceVertical refreshing={refresh.refreshing} onRefresh={() => void reloadProfile()}>{content}</RefreshableScrollView>
