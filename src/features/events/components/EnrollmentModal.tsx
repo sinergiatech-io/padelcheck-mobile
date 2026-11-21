@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Keyboard, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { PlayerPersonIcon } from '@/components/icons/PlayerPersonIcon'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/context/AuthContext'
 import { fetchPlayerPage } from '@/features/players/use-player-search'
 import { eventsMockService } from '@/features/events/api/events.mock'
 import { useEnrollmentModal } from '@/features/events/context/EnrollmentModalContext'
@@ -78,6 +79,9 @@ function PlayerSearchSlot({
   onSelect: (player: EnrollablePlayer) => void
   onClear: () => void
 }) {
+  const { user } = useAuth()
+  const ownPlayerId = user?.accessContexts?.find(context => context.activity === 'PLAYER')?.playerId ?? user?.playerId
+  const exclusionKey = [...new Set([ownPlayerId, ...excludeIds].filter(Boolean))].join(',')
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<EnrollablePlayer[]>([])
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -95,7 +99,7 @@ function PlayerSearchSlot({
     setResults([])
     if (!dropdownOpen || query.trim().length < 2) return
     const controller = new AbortController()
-    const exclusions = excludeIds.filter(id => /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id))
+    const exclusions = exclusionKey.split(',').filter(id => /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id))
     const timer = setTimeout(() => {
       void fetchPlayerPage({ query }, 0, controller.signal, exclusions).then(page => {
         if (controller.signal.aborted) return
@@ -109,7 +113,7 @@ function PlayerSearchSlot({
       })
     }, 200)
     return () => { clearTimeout(timer); controller.abort() }
-  }, [query, excludeIds, player, dropdownOpen, attempt])
+  }, [query, exclusionKey, player, dropdownOpen, attempt])
 
   const showResults = dropdownOpen && !player && results.length > 0
 
