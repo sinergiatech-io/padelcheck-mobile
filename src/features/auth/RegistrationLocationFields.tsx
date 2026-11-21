@@ -57,7 +57,7 @@ export function RegistrationLocationFields({ model, state, disabled, wizard = fa
         accessibilityLabel={`Provincia, obligatorio, ${provinceLabel}${state.errors.province ? ', ' + state.errors.province : ''}`}
         onSelect={id => { const province = provinceOptions.find(item => item.id === id); if (province) void model.selectProvince(province) }} /> : <Select value={state.province?.id} onValueChange={id => { const province = provinceOptions.find(item => item.id === id); if (province) void model.selectProvince(province) }}>
         <SelectTrigger disabled={provinceDisabled} accessibilityRole="button" accessibilityLabel={`Provincia, obligatorio, ${provinceLabel}${state.errors.province ? ', ' + state.errors.province : ''}`} accessibilityState={{ disabled: provinceDisabled }} className={`${fieldClass} disabled:opacity-100 ${state.errors.province ? 'border-[#EF4444]' : ''}`} indicator={<SvgXml xml={chevronXml} />}>
-          <SelectValue className={`font-inter-500 text-[14px] leading-[20px] ${state.province ? 'text-[#120F18]' : 'text-[#605E64]'}`} placeholder={state.provinceStatus === 'loading' ? 'Cargando provincias…' : provincePlaceholder} />
+          <SelectValue className={`font-inter-500 text-[14px] leading-[20px] ${state.province ? 'text-[#120F18]' : 'text-[#605E64]'}`} label={provinceLabel} />
         </SelectTrigger>
         <SelectContent>{provinceOptions.map(option => <SelectItem key={option.id} value={option.id}>{option.name}</SelectItem>)}</SelectContent>
       </Select>}
@@ -72,7 +72,7 @@ export function RegistrationLocationFields({ model, state, disabled, wizard = fa
         accessibilityLabel={`Localidad, obligatorio, ${localityLabel}${state.errors.locality ? ', ' + state.errors.locality : ''}`}
         onSelect={id => { const locality = localityOptions.find(item => item.id === id); if (locality) model.selectLocality(locality) }} /> : <Select value={state.selection?.localityId} onValueChange={id => { const locality = localityOptions.find(item => item.id === id); if (locality) model.selectLocality(locality) }}>
         <SelectTrigger disabled={localityDisabled} accessibilityRole="button" accessibilityLabel={`Localidad, obligatorio, ${localityLabel}${state.errors.locality ? ', ' + state.errors.locality : ''}`} accessibilityState={{ disabled: localityDisabled }} style={wizard && !state.province ? { backgroundColor: '#F7F7F7' } : undefined} className={`${fieldClass} ${!state.province && !disabled ? 'disabled:opacity-100' : ''} ${state.errors.locality ? 'border-[#EF4444]' : ''}`} indicator={<SvgXml xml={chevronXml} />}>
-          <SelectValue className={`font-inter-500 text-[14px] leading-[20px] ${state.selection ? 'text-[#120F18]' : 'text-[#605E64]'}`} placeholder={!state.province || state.localityStatus !== 'loading' || state.selection ? localityIdle : 'Cargando localidades…'} />
+          <SelectValue className={`font-inter-500 text-[14px] leading-[20px] ${state.selection ? 'text-[#120F18]' : 'text-[#605E64]'}`} label={localityLabel} />
         </SelectTrigger>
         <SelectContent>{localityOptions.map(option => <SelectItem key={option.id} value={option.id}>{option.name}</SelectItem>)}</SelectContent>
       </Select>}
