@@ -37,6 +37,7 @@ function ProfileEditor({ profile }: { profile: OwnProfile }) {
   const { user } = useAuth()
   const flight = useRef(false)
   const [saving, setSaving] = useState(false)
+  const [picking, setPicking] = useState(false)
   const [notice, setNotice] = useState('')
   const [phone, setPhone] = useState(profile.phone ?? '')
   const [photo, setPhoto] = useState<ImagePicker.ImagePickerAsset>()
@@ -49,17 +50,28 @@ function ProfileEditor({ profile }: { profile: OwnProfile }) {
 
   async function pickPhoto() {
     if (flight.current) return
+    flight.current = true
+    setPicking(true)
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85, allowsEditing: true, aspect: [1, 1] })
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85, base64: true })
       const selected = result.assets?.[0]
       if (!selected) return
       if ((selected.fileSize ?? 0) > 5 * 1024 * 1024 || (selected.mimeType && !['image/jpeg', 'image/png'].includes(selected.mimeType))) {
         setNotice('Elegí un archivo JPG o PNG de hasta 5 MB.')
         return
       }
+      if (!selected.base64) {
+        setNotice('No pudimos leer la foto. Elegí otra o reintentá.')
+        return
+      }
       setNotice('')
       setPhoto(selected)
-    } catch { setNotice('No pudimos abrir tus fotos. Reintentá.') }
+    } catch {
+      setNotice('No pudimos abrir tus fotos. Reintentá.')
+    } finally {
+      flight.current = false
+      setPicking(false)
+    }
   }
 
   async function save() {
@@ -70,17 +82,13 @@ function ProfileEditor({ profile }: { profile: OwnProfile }) {
     const key = profileKey(user?.userId)
     const generation = currentSessionGeneration()
     try {
-      const request = { phone: phone.trim(), location: locationChanged ? model.request() : undefined }
-      await cache.cancelQueries({ queryKey: key, exact: true })
-      let updated: OwnProfile
-      if (photo) {
-        const form = new FormData()
-        form.append('profile', JSON.stringify(request))
-        form.append('avatar', { uri: photo.uri, name: photo.fileName ?? 'avatar.jpg', type: photo.mimeType ?? 'image/jpeg' } as unknown as Blob)
-        updated = await apiClient.patchForm<OwnProfile>('/players/me', form, profileRequest)
-      } else {
-        updated = await apiClient.patch<OwnProfile>('/players/me', request, profileRequest)
+      const request = {
+        phone: phone.trim(),
+        location: locationChanged ? model.request() : undefined,
+        avatarBase64: photo?.base64 ?? undefined,
       }
+      await cache.cancelQueries({ queryKey: key, exact: true })
+      const updated = await apiClient.patch<OwnProfile>('/players/me', request, profileRequest)
       if (generation !== currentSessionGeneration()) return
       cache.setQueryData(key, { ...updated, recentTournaments: profile.recentTournaments, stats: profile.stats })
       router.dismissTo({ pathname: '/settings', params: { saved: '1' } })
@@ -103,9 +111,10 @@ function ProfileEditor({ profile }: { profile: OwnProfile }) {
         <ProfileAvatar profile={profile} preview={photo?.uri} size={72} />
         <View className="flex-1 gap-1">
           <Text className="font-sans text-xs text-[#605e64]">Foto de perfil</Text>
-          <Pressable accessibilityRole="button" disabled={saving} onPress={() => { void pickPhoto() }}>
-            <Text className="font-inter-600 text-sm">Cambiar foto</Text>
+          <Pressable accessibilityRole="button" accessibilityState={{ busy: picking }} disabled={saving || picking} onPress={() => { void pickPhoto() }}>
+            <Text className="font-inter-600 text-sm">{picking ? 'Cargando foto…' : 'Cambiar foto'}</Text>
           </Pressable>
+          {photo && <Text accessibilityLiveRegion="polite" className="font-sans text-xs text-[#605e64]">Foto seleccionada</Text>}
           <Text className="font-sans text-xs text-[#605e64]">JPG o PNG · máx. 5 MB</Text>
         </View>
       </View>
@@ -125,7 +134,7 @@ function ProfileEditor({ profile }: { profile: OwnProfile }) {
       {notice && <Text accessibilityLiveRegion="polite" className="rounded-lg bg-red-50 p-3 font-sans text-sm text-red-800">{notice}</Text>}
     </ScrollView>
     <View className="px-4 pb-4 pt-2">
-      <Button className="h-12 rounded-lg" loading={saving} loadingLabel="Guardando cambios" onPress={() => { void save() }}>Guardar cambios</Button>
+      <Button className="h-12 rounded-lg" disabled={picking} loading={saving} loadingLabel="Guardando cambios" onPress={() => { void save() }}>Guardar cambios</Button>
     </View>
   </>
 }
@@ -218,7 +227,7 @@ export function SecurityScreen({ changing = false }: { changing?: boolean }) {
     {data && (changing && data.hasLocalPassword ? <PasswordFields /> : <View className="gap-3 p-4">
       {saved === '1' && <Text accessibilityLiveRegion="polite" className="rounded-lg bg-[#f8f9e9] p-3 font-sans text-sm">Contraseña actualizada</Text>}
       <Text accessibilityRole="header" className="font-inter-600 text-xl">Contraseña de PadelCheck</Text>
-      <Text className={copy}>{data.hasLocalPassword ? 'Podés cambiar tu contraseña desde esta cuenta.' : 'Te enviamos un enlace por email para crear tu contraseña.'}</Text>
+      <Text className={copy}>{data.hasLocalPassword ? 'Podés cambiar tu contraseña desde esta cuenta.' : 'Usás Google para ingresar. Podés crear una contraseña con un enlace enviado a tu email.'}</Text>
       <Button className="h-10 rounded-lg" onPress={() => router.push(data.hasLocalPassword ? '/profile-settings/password' : '/forgot-password')}>
         {data.hasLocalPassword ? 'Cambiar contraseña' : 'Crear contraseña'}
       </Button>
