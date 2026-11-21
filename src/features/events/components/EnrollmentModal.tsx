@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Keyboard, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { PlayerPersonIcon } from '@/components/icons/PlayerPersonIcon'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/context/AuthContext'
+import { fetchPlayerPage } from '@/features/players/use-player-search'
 import { eventsMockService } from '@/features/events/api/events.mock'
 import { useEnrollmentModal } from '@/features/events/context/EnrollmentModalContext'
 import { useEnrollmentForm } from '@/features/events/hooks/use-enrollment-form'
@@ -77,9 +79,14 @@ function PlayerSearchSlot({
   onSelect: (player: EnrollablePlayer) => void
   onClear: () => void
 }) {
+  const { user } = useAuth()
+  const ownPlayerId = user?.accessContexts?.find(context => context.activity === 'PLAYER')?.playerId ?? user?.playerId
+  const exclusionKey = [...new Set([ownPlayerId, ...excludeIds].filter(Boolean))].join(',')
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<EnrollablePlayer[]>([])
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [searchError, setSearchError] = useState(false)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     if (player) {
@@ -88,12 +95,25 @@ function PlayerSearchSlot({
       setDropdownOpen(false)
       return
     }
-    if (!dropdownOpen) return
+    setSearchError(false)
+    setResults([])
+    if (!dropdownOpen || query.trim().length < 2) return
+    const controller = new AbortController()
+    const exclusions = exclusionKey.split(',').filter(id => /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id))
     const timer = setTimeout(() => {
-      eventsMockService.searchEnrollmentPlayers(query, { excludeIds }).then(setResults)
+      void fetchPlayerPage({ query }, 0, controller.signal, exclusions).then(page => {
+        if (controller.signal.aborted) return
+        setResults(page.items.map(item => ({
+          id: item.playerId,
+          name: [item.firstName, item.lastName].filter(Boolean).join(' '),
+          location: item.city ?? '',
+        })))
+      }).catch(() => {
+        if (!controller.signal.aborted) setSearchError(true)
+      })
     }, 200)
-    return () => clearTimeout(timer)
-  }, [query, excludeIds, player, dropdownOpen])
+    return () => { clearTimeout(timer); controller.abort() }
+  }, [query, exclusionKey, player, dropdownOpen, attempt])
 
   const showResults = dropdownOpen && !player && results.length > 0
 
@@ -124,6 +144,9 @@ function PlayerSearchSlot({
               style={{ includeFontPadding: false, textAlignVertical: 'center' }}
             />
           </View>
+          {dropdownOpen && searchError && <Pressable accessibilityRole="button" onPress={() => setAttempt(value => value + 1)} className="py-3">
+            <Text className="font-sans text-sm underline">No pudimos buscar jugadores. Reintentar</Text>
+          </Pressable>}
           {showResults && results.length > 0 ? (
             <ScrollView
               className="mt-1 max-h-48 rounded-lg border border-[#e7e7e8] bg-surface"

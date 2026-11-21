@@ -1,25 +1,31 @@
-import { useCallback, useEffect, useState } from 'react'
-import { myTournamentsMockService } from '@/features/my-tournaments/api/my-tournaments.mock'
-import type { MyTournament } from '@/features/my-tournaments/types'
+import { useInfiniteQuery } from '@tanstack/react-query'
+import { useAuth } from '@/context/AuthContext'
+import { ApiError, apiClient } from '@/lib/api-client'
+import type { MyTournament, MyTournamentResult, MyTournamentTab } from '../types'
 
-export function useMyTournamentsQuery() {
-  const [active, setActive] = useState<MyTournament[]>([])
-  const [history, setHistory] = useState<MyTournament[]>([])
-  const [loading, setLoading] = useState(true)
+const labels = { CHAMPION: 'campeon', FINALIST: 'final', SEMIFINAL: 'semifinal', QUARTERFINAL: 'cuartos' } as const
+type Result = keyof typeof labels | 'UNAVAILABLE'
+type TournamentDto = Omit<MyTournament, 'categoryId' | 'dateLabel' | 'result'> & { divisionId: string; date: string; result: Result | null }
+type Page = { items: TournamentDto[]; page: number; hasMore: boolean }
+const dateLabel = new Intl.DateTimeFormat('es-AR', { dateStyle: 'long', timeZone: 'UTC' })
 
-  const load = useCallback(async () => {
-    const [nextActive, nextHistory] = await Promise.all([
-      myTournamentsMockService.listActive(),
-      myTournamentsMockService.listHistory(),
-    ])
-    setActive(nextActive)
-    setHistory(nextHistory)
-    setLoading(false)
-  }, [])
-
-  useEffect(() => {
-    void load()
-  }, [load])
-
-  return { active, history, loading, reload: load }
+export function useMyTournamentsQuery(tab: MyTournamentTab) {
+  const { user } = useAuth()
+  const query = useInfiniteQuery({
+    queryKey: ['my-tournaments', user?.userId, tab],
+    enabled: Boolean(user),
+    initialPageParam: 0,
+    retry: false,
+    queryFn: ({ pageParam, signal }) =>
+      apiClient.get<Page>('/players/me/tournaments?history=' + (tab === 'historial') + '&page=' + pageParam, { signal, timeoutMs: 15000 }),
+    getNextPageParam: page => page.hasMore ? page.page + 1 : undefined,
+  })
+  const restricted = query.error instanceof ApiError && [401, 403, 404].includes(query.error.status)
+  const rows: MyTournament[] = restricted ? [] : query.data?.pages.flatMap(page => page.items.map(item => ({
+    ...item,
+    categoryId: item.divisionId,
+    dateLabel: dateLabel.format(new Date(item.date + 'T00:00:00Z')),
+    result: item.result && item.result in labels ? labels[item.result as keyof typeof labels] as MyTournamentResult : undefined,
+  }))) ?? []
+  return { ...query, rows }
 }

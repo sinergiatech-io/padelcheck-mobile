@@ -130,7 +130,9 @@ function isPlayerArea(platform: AccessPlatform, pathname: string): boolean {
     pathname.startsWith(`${NATIVE_PLAYER_ROOT}/`) ||
     pathname === '/my-tournaments' ||
     pathname === '/players' ||
-    pathname === '/settings'
+    pathname === '/settings' ||
+    /^\/profile-settings\/(?:edit|security|password)$/.test(pathname) ||
+    /^\/player\/[\w-]+(?:\/history(?:\/[\w-]+\/[\w-]+\/results)?)?$/.test(pathname)
   )
 }
 
@@ -191,6 +193,7 @@ function registeredPath(platform: AccessPlatform, candidate: string) {
       '/club/settings/categories', '/club/settings/venues'].includes(candidate)
   }
   if (/^\/events\/[\w-]+(?:\/categories\/[\w-]+(?:\/(?:enroll|inscripciones|clasificatoria|cuadros|resultados))?)?$/.test(candidate)) return true
+  if (/^\/(?:player\/[\w-]+(?:\/history(?:\/[\w-]+\/[\w-]+\/results)?)?|profile-settings\/(?:edit|security|password))$/.test(candidate)) return true
   return ['/events', '/dashboard', '/my-tournaments', '/players', '/settings', '/club', '/club/plan',
     '/club/settings', '/club/settings/info', '/club/settings/tournaments', '/club/settings/categories',
     '/club/settings/venues'].includes(candidate)
