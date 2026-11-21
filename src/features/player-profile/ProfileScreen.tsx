@@ -232,22 +232,33 @@ export function HistoryScreen({ playerId }: { playerId: string }) {
 }
 
 export function TournamentResultsScreen({ playerId, eventId, divisionId }: { playerId: string; eventId: string; divisionId: string }) {
-  const query = useTournamentResults(playerId, eventId, divisionId)
+  const { active: activeParam } = useLocalSearchParams<{ active?: string }>()
+  const active = activeParam === '1'
+  const query = useTournamentResults(playerId, eventId, divisionId, active)
   const data = hideProfileOn(query.error) ? undefined : query.data
   const { refreshing, onRefresh } = useRefreshControl(async () => { await query.refetch({ cancelRefetch: false }) })
   return <SafeAreaView edges={['bottom']} className="flex-1 bg-[#FEFEFE]">
-    <ProfileHeader title="Resultados oficiales" back={() => {
+    <ProfileHeader title={active ? 'Detalle del torneo' : 'Resultados oficiales'} back={() => {
       if (router.canGoBack()) router.back()
+      else if (active) router.replace('/my-tournaments')
       else router.replace({ pathname: '/player/[playerId]/history', params: { playerId } })
     }} />
     <RefreshableScrollView alwaysBounceVertical refreshing={refreshing} onRefresh={onRefresh}
       contentContainerStyle={{ padding: 16, paddingTop: 20, gap: 12, flexGrow: 1 }}>
       {query.isPending && <ProfileSkeleton />}
-      {query.isError && <ProfileError message="No pudimos cargar los resultados." onRetry={() => { void query.refetch() }} />}
+      {query.isError && <ProfileError message={active ? 'No pudimos cargar el torneo.' : 'No pudimos cargar los resultados.'} onRetry={() => { void query.refetch() }} />}
       {data && <>
         <Text accessibilityRole="header" className="font-inter-600 text-lg">{data.tournament}</Text>
         <Text className={secondary}>{data.category}</Text>
-        {!data.matches.length && <Text className={secondary}>Resultado no disponible</Text>}
+        {active && <View className="gap-2 rounded-2xl border border-[#e7e7e8] p-4">
+          <Text className={secondary}>{data.registration === 'WAITLIST' ? 'En lista de espera' : 'Inscripción confirmada'}</Text>
+          <Text className={titleClass}>Próximo partido</Text>
+          {data.nextMatch ? <>
+            <Text className={secondary}>{new Date(data.nextMatch.startsAt).toLocaleString('es-AR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Argentina/Buenos_Aires' })}</Text>
+            <Text className={secondary}>{data.nextMatch.venue} · {data.nextMatch.court}</Text>
+          </> : <Text className={secondary}>Todavía no hay un partido programado.</Text>}
+        </View>}
+        {!active && !data.matches.length && <Text className={secondary}>Resultado no disponible</Text>}
         {data.matches.map(match => <View key={match.id} className="gap-2 rounded-2xl border border-[#e7e7e8] p-4">
           <Text className={titleClass}>{match.home} vs. {match.away}</Text>
           <Text className={secondary}>{match.walkover ? 'Walkover' : match.sets.length ? match.sets.map(set => set.home + '–' + set.away).join(' · ') : 'Marcador no disponible'}</Text>

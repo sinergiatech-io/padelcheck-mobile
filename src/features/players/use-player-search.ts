@@ -9,12 +9,23 @@ type Player = {
   playerId: string
   firstName: string
   lastName: string
+  city: string | null
   gender: GenderFilter | 'OTHER' | null
   baseCategoryName: string | null
 }
 type PlayerPage = { items: Player[]; page: number; totalPages: number }
 
 const timeoutMs = 15000
+
+export function fetchPlayerPage({ query, gender, categoryId }: Criteria, page: number, signal: AbortSignal, excludeIds: string[] = []) {
+  const params = new URLSearchParams({ page: String(page) })
+  const text = query.trim()
+  if (text.length >= 2) params.set('q', text)
+  if (gender) params.set('gender', gender)
+  if (categoryId) params.set('categoryId', categoryId)
+  for (const id of excludeIds) params.append('excludePlayerIds', id)
+  return apiClient.get<PlayerPage>('/players/search?' + params, { signal, timeoutMs })
+}
 
 export function usePlayerSearch({ query, gender, categoryId }: Criteria) {
   const { user } = useAuth()
@@ -31,13 +42,7 @@ export function usePlayerSearch({ query, gender, categoryId }: Criteria) {
     enabled: active && Boolean(user),
     initialPageParam: 0,
     retry: false,
-    queryFn: ({ pageParam, signal }) => {
-      const params = new URLSearchParams({ page: String(pageParam) })
-      if (text.length >= 2) params.set('q', text)
-      if (gender) params.set('gender', gender)
-      if (categoryId) params.set('categoryId', categoryId)
-      return apiClient.get<PlayerPage>('/players/search?' + params, { signal, timeoutMs })
-    },
+    queryFn: ({ pageParam, signal }) => fetchPlayerPage({ query: text, gender, categoryId }, pageParam, signal),
     getNextPageParam: page => page.page + 1 < page.totalPages ? page.page + 1 : undefined,
   })
   const restricted = results.error instanceof ApiError && [401, 403].includes(results.error.status)

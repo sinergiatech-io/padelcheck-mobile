@@ -37,6 +37,8 @@ type HistoryPage = { items: Participation[]; page: number; hasMore: boolean }
 export type TournamentResults = {
   tournament: string
   category: string
+  registration?: 'CONFIRMED' | 'WAITLIST'
+  nextMatch?: { startsAt: string; venue: string; court: string }
   matches: { id: string; home: string; away: string; winner: string; sets: { home: number; away: number }[]; walkover: boolean }[]
 }
 
@@ -81,14 +83,14 @@ export function useSportingHistory(playerId: string) {
   })
 }
 
-export function useTournamentResults(playerId: string, eventId: string, divisionId: string) {
+export function useTournamentResults(playerId: string, eventId: string, divisionId: string, active = false) {
   const { user } = useAuth()
   const segments = [playerId, eventId, divisionId].map(encodeURIComponent)
   const path = '/players/' + segments[0] + '/history/' + segments[1] + '/' + segments[2] + '/results'
   return useQuery({
-    queryKey: [...profileKey(user?.userId, playerId), 'results', eventId, divisionId],
+    queryKey: [...profileKey(user?.userId, playerId), 'results', eventId, divisionId, active],
     retry: false,
-    queryFn: ({ signal }) => apiClient.get<TournamentResults>(path, { ...profileRequest, signal }),
+    queryFn: ({ signal }) => apiClient.get<TournamentResults>(active ? path + '?active=true' : path, { ...profileRequest, signal }),
   })
 }
 

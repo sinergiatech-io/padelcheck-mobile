@@ -100,8 +100,11 @@ function CardBody({ tournament, variant }: MyTournamentCardProps) {
 
 export function MyTournamentCard({ tournament, variant }: MyTournamentCardProps) {
   if (variant === 'active') {
+    const path = tournament.playerId
+      ? `/player/${tournament.playerId}/history/${tournament.eventId}/${tournament.categoryId}/results?active=1`
+      : myTournamentCategoryPath(tournament)
     return (
-      <Link href={myTournamentCategoryPath(tournament)} asChild>
+      <Link href={path} asChild>
         <Pressable accessibilityRole="button">
           <CardBody tournament={tournament} variant={variant} />
         </Pressable>
