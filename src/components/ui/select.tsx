@@ -58,12 +58,12 @@ export function SelectTrigger({ className, children, indicator, ...props }: Pres
   )
 }
 
-export function SelectValue({ placeholder, className }: { placeholder?: string; className?: string }) {
+export function SelectValue({ label, placeholder, className }: { label?: string; placeholder?: string; className?: string }) {
   const { value, labels } = useSelect()
-  const label = value != null ? labels[value] : undefined
+  const registeredLabel = value != null ? labels[value] : undefined
   return (
     <Text className={cn('font-sans text-sm text-dark-900', className)} numberOfLines={1}>
-      {label ?? placeholder ?? ''}
+      {label ?? registeredLabel ?? placeholder ?? ''}
     </Text>
   )
 }
