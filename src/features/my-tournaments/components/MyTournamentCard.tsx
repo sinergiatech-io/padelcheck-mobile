@@ -77,12 +77,15 @@ function CardBody({ tournament, variant }: MyTournamentCardProps) {
       <View className="border-t border-[#b6b5b7] px-4 py-2">
         <DetailRow label="Categoría" value={tournament.categoryName} />
         <DetailRow label="Compañero" value={tournament.partnerName} />
+        {variant === 'active' && tournament.registrationStatus === 'WAITLIST' &&
+          <DetailRow label="Inscripción" value="En lista de espera" />}
         {variant === 'history' && tournament.result ? (
           <View className="flex-row items-center justify-between">
             <Text className="font-inter-500 text-body-sm leading-8 text-[#605e64]">Resultado</Text>
             <TournamentResultChip result={tournament.result} />
           </View>
         ) : null}
+        {variant === 'history' && !tournament.result && <DetailRow label="Resultado" value="Resultado no disponible" />}
       </View>
 
       {variant === 'active' ? (
@@ -106,5 +109,7 @@ export function MyTournamentCard({ tournament, variant }: MyTournamentCardProps)
     )
   }
 
-  return <CardBody tournament={tournament} variant={variant} />
+  return tournament.playerId ? <Link href={`/player/${tournament.playerId}/history/${tournament.eventId}/${tournament.categoryId}/results`} asChild>
+    <Pressable accessibilityRole="link"><CardBody tournament={tournament} variant={variant} /></Pressable>
+  </Link> : <CardBody tournament={tournament} variant={variant} />
 }

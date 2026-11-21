@@ -145,6 +145,8 @@ export function createApiClient({ baseUrl, getToken, credentials }: ClientConfig
       request<T>(path, { ...options, method: 'POST', body }),
     put: <T>(path: string, body?: unknown, options?: ApiRequestOptions) => write<T>('PUT', path, body, options),
     patch: <T>(path: string, body?: unknown, options?: ApiRequestOptions) => write<T>('PATCH', path, body, options),
+    patchForm: <T>(path: string, body: FormData, options?: ApiRequestOptions) =>
+      request<T>(path, { ...options, method: 'PATCH', body }),
     delete: <T = void>(path: string, options?: ApiRequestOptions) => request<T>(path, { ...options, method: 'DELETE' }),
   }
 }

@@ -7,6 +7,8 @@ export type MyTournamentResult = 'campeon' | 'final' | 'semifinal' | 'cuartos'
 /** Torneo en el que participa el jugador logueado. */
 export type MyTournament = {
   id: string
+  playerId?: string
+  registrationStatus?: 'CONFIRMED' | 'WAITLIST'
   eventId: string
   categoryId: string
   title: string

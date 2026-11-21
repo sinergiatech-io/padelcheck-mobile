@@ -1,31 +1,86 @@
-import { Text, View } from 'react-native'
+import { useState } from 'react'
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { router } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Search } from 'lucide-react-native'
+import { Button } from '@/components/ui/button'
+import { RefreshableScrollView } from '@/components/ui/refreshable-scroll-view'
+import { ArrowForwardIcon } from '@/components/icons/TournamentCardIcons'
+import { useRefreshControl } from '@/hooks/use-refresh-control'
+import { categoryLabel, genderOptions, usePlayerSearch } from '@/features/players/use-player-search'
+import type { GenderFilter } from '@/features/players/use-player-search'
+
+function Filter({ current, label, onPress }: { current: boolean; label: string; onPress: () => void }) {
+  return <Pressable accessibilityRole="button" accessibilityState={{ selected: current }} onPress={onPress}
+    className={'h-[34px] shrink-0 justify-center rounded-full border px-3 ' + (current ? 'border-[#C9CF38] bg-[#f8f9e9]' : 'border-[#b6b5b7] bg-white')}>
+    <Text className="font-inter-500 text-xs text-[#605e64]">{label}</Text>
+  </Pressable>
+}
 
 export default function PlayersScreen() {
-  return (
-    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-      <View className="flex-1 gap-4 bg-background p-6">
-        <View className="flex flex-row flex-wrap items-center gap-3">
-          <Text className="font-inter-600 text-h2 text-dark-900">Jugadores</Text>
-          <Badge variant="neutral">En construcción</Badge>
-        </View>
-        <Text className="font-sans text-body-sm text-dark-700">
-          Búsqueda y contacto de jugadores (jugador).
-        </Text>
-        <Card className="shadow-card">
-          <CardHeader>
-            <CardTitle className="text-h4">Placeholder</CardTitle>
-            <CardDescription>Próximamente listados según diseño Figma.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Text className="text-center font-sans text-body-sm text-dark-700">
-              Contenido pendiente de backend.
-            </Text>
-          </CardContent>
-        </Card>
-      </View>
+  const [query, setQuery] = useState('')
+  const [gender, setGender] = useState<GenderFilter>()
+  const [categoryId, setCategory] = useState<string>()
+  const { categories, results, active, rows } = usePlayerSearch({ query, gender, categoryId })
+  const { refreshing, onRefresh } = useRefreshControl(async () => {
+    if (active) await results.refetch({ cancelRefetch: false })
+  })
+  return <View className="flex-1 bg-[#f2f2f3]">
+    <SafeAreaView edges={['top']} className="bg-[#120F18]">
+      <Text accessibilityRole="header" className="px-4 py-4 font-inter-700 text-xl text-white">Jugadores</Text>
     </SafeAreaView>
-  )
+    <View className="gap-2 px-4 pb-3 pt-3">
+      <View className="flex-row items-center gap-2 rounded-lg border border-[#b6b5b7] bg-white px-4">
+        <Search size={16} color="#929195" />
+        <TextInput autoCorrect={false} maxLength={128} accessibilityLabel="Buscar jugadores"
+          placeholder="Buscar jugadores…" placeholderTextColor="#929195" value={query} onChangeText={setQuery}
+          className="h-[46px] flex-1 font-inter-500 text-sm text-[#120F18]" />
+      </View>
+      <View className="flex-row gap-2">
+        {genderOptions.map(option => <Filter key={option.label} label={option.label} current={gender === option.value}
+          onPress={() => setGender(option.value)} />)}
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ gap: 8 }}>
+        <Filter label="Todos" current={!categoryId} onPress={() => setCategory(undefined)} />
+        {categories.data?.map(category => <Filter key={category.id} label={category.name}
+          current={categoryId === category.id} onPress={() => setCategory(category.id)} />)}
+      </ScrollView>
+      {categories.isError && <View className="flex-row items-center justify-between">
+        <Text className="font-sans text-sm">No pudimos cargar las categorías.</Text>
+        <Button variant="ghost" onPress={() => { void categories.refetch() }}>Reintentar</Button>
+      </View>}
+    </View>
+    <RefreshableScrollView alwaysBounceVertical={active} refreshing={refreshing} onRefresh={onRefresh}
+      keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16, flexGrow: 1 }}>
+      {!active && <Text className="py-5 font-sans text-sm text-[#605e64]">Buscá por nombre o elegí un filtro.</Text>}
+      {active && results.isPending && <View accessibilityLabel="Buscando jugadores" className="gap-1">
+        {[1, 2, 3, 4].map(id => <View key={id} className="h-16 rounded-lg bg-[#e7e7e8]" />)}
+      </View>}
+      {active && results.isError && <View className="rounded-lg bg-white p-4">
+        <Text accessibilityLiveRegion="polite" className="font-sans text-sm">No pudimos cargar los jugadores. Revisá tu conexión.</Text>
+        <Button variant="ghost" onPress={() => { void results.refetch() }}>Reintentar</Button>
+      </View>}
+      {active && results.isSuccess && !rows.length && <View className="gap-1 rounded-lg bg-white p-4">
+        <Text className="font-inter-600 text-sm">Sin resultados</Text>
+        <Text className="font-sans text-sm text-[#605e64]">Probá con otro nombre o cambiá los filtros.</Text>
+      </View>}
+      <View className="overflow-hidden rounded-t-xl">
+        {rows.map(player => <Pressable key={player.playerId} accessibilityRole="link"
+          onPress={() => router.push('/player/' + player.playerId)}
+          className="min-h-16 flex-row items-center gap-3 border-b border-[#f2f2f3] bg-white px-3 py-2">
+          <View className="h-10 w-10 items-center justify-center rounded-full bg-[#C9CF38]">
+            <Text className="font-inter-600 text-sm text-white">{(player.firstName.slice(0, 1) + player.lastName.slice(0, 1)).toUpperCase()}</Text>
+          </View>
+          <View className="min-w-0 flex-1">
+            <Text className="font-inter-600 text-sm">{player.firstName} {player.lastName}</Text>
+            <Text className="font-sans text-xs text-[#605e64]">{categoryLabel(player)}</Text>
+          </View>
+          <ArrowForwardIcon size={20} color="#605E64" />
+        </Pressable>)}
+      </View>
+      {results.hasNextPage && <Button variant="secondary" className="mt-3" loading={results.isFetchingNextPage}
+        onPress={() => { void results.fetchNextPage() }}>Ver más</Button>}
+    </RefreshableScrollView>
+  </View>
 }
