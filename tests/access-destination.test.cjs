@@ -100,3 +100,13 @@ test('account entry drops revoked context and unsupported routes', () => {
   assert.equal(entry.path, '/app/events')
   assert.equal(accountEntry('web', [player, club], '/not-a-route', null).path, '/auth/continue')
 })
+
+test('native "Cambiar plan" from /pricing returns a club admin to /club/plan after login (KAN-141)', () => {
+  const { accessChoices, accountEntry } = require(process.env.SESSION_TEST_MODULE)
+  const player = { activity: 'PLAYER', playerId: 'p1' }
+  const club = { activity: 'CLUB', clubId: 'c1', membershipId: 'm1', initialSetupStatus: 'COMPLETED' }
+  assert.equal(accountEntry('native', [club], '/club/plan', null).path, '/club/plan')
+  const both = [player, club]
+  assert.equal(accountEntry('native', both, '/club/plan', accessChoices(both)[0].key).path, '/club/plan')
+  assert.notEqual(accountEntry('native', [player], '/club/plan', null).path, '/club/plan')
+})

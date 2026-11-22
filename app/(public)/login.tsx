@@ -259,6 +259,14 @@ export default function LoginScreen() {
               <Text className="font-inter-500 text-[14px] leading-[21px] text-[#120F18]">Club</Text>
             </Pressable>
           </View>
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel="Comparar planes"
+            onPress={() => router.push('/pricing')}
+            className="mt-[8px] h-[44px] items-center justify-center"
+          >
+            <Text className="font-inter-500 text-[14px] leading-[20px] text-[#120F18]">Comparar planes</Text>
+          </Pressable>
         </View>
       </ScrollView>
     </KeyboardAvoidingView></StartupReady>
