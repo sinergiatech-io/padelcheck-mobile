@@ -416,3 +416,35 @@ test('changing tournament hides the previous event until its own usage arrives',
   assert.equal(session.snapshot().subscription.recurrencePaused, false)
 })
 
+
+test('invoice notice appears only for a pending paid period', () => {
+  const missing = plan.parseSubscription(subscription({
+    planCode: 'PRO',
+    commercialPeriod: { kind: 'PAID', medium: 'TRANSFER', planCode: 'PRO', periodStart: '2026-11-01', periodEnd: '2026-12-01', open: true },
+  }))
+  assert.equal(missing.commercialPeriod.invoiceStatus, 'ABSENT')
+  assert.equal(plan.invoiceNotice(missing.commercialPeriod), null)
+
+  const pending = plan.parseSubscription(subscription({
+    planCode: 'PRO',
+    commercialPeriod: { kind: 'PAID', medium: 'TRANSFER', planCode: 'PRO', periodStart: '2026-11-01', periodEnd: '2026-12-01', open: true, invoiceStatus: 'PENDING' },
+  }))
+  assert.equal(pending.commercialPeriod.invoiceStatus, 'PENDING')
+  assert.deepEqual(plan.invoiceNotice(pending.commercialPeriod), {
+    title: 'Factura pendiente',
+    body: 'Tu plan ya está activo. La factura se emite después del cobro y no bloquea el uso del plan.',
+  })
+
+  const issued = plan.parseSubscription(subscription({
+    planCode: 'PRO',
+    commercialPeriod: { kind: 'PAID', medium: 'TRANSFER', planCode: 'PRO', periodStart: '2026-11-01', periodEnd: '2026-12-01', open: true, invoiceStatus: 'ISSUED' },
+  }))
+  assert.equal(issued.commercialPeriod.invoiceStatus, 'ISSUED')
+  assert.equal(plan.invoiceNotice(issued.commercialPeriod), null)
+
+  const courtesy = plan.parseSubscription(subscription({
+    planCode: 'PRO',
+    commercialPeriod: { kind: 'COURTESY', medium: 'COURTESY', planCode: 'PRO', periodStart: '2026-11-01', periodEnd: null, open: true, invoiceStatus: 'PENDING' },
+  }))
+  assert.equal(plan.invoiceNotice(courtesy.commercialPeriod), null)
+})

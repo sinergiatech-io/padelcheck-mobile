@@ -42,6 +42,7 @@ export interface CommercialPeriod {
   periodStart: string | null
   periodEnd: string | null
   open: boolean
+  invoiceStatus: 'PENDING' | 'ISSUED' | 'ABSENT'
 }
 
 export interface BillingActions {
@@ -258,6 +259,11 @@ export function parsePlanOffer(value: unknown): PlanOffer | null {
   return { code: codeValue, name, description: text(source.description), free: source.free, features: features as PlanFeature[], price }
 }
 
+
+function invoiceStatusOf(value: unknown): CommercialPeriod['invoiceStatus'] {
+  return value === 'PENDING' || value === 'ISSUED' ? value : 'ABSENT'
+}
+
 export function parseSubscription(value: unknown): ClubSubscription | null {
   const source = record(value)
   if (!source) return null
@@ -290,6 +296,7 @@ export function parseSubscription(value: unknown): ClubSubscription | null {
     periodStart: dateText(periodSource.periodStart),
     periodEnd: dateText(periodSource.periodEnd),
     open: periodSource.open === true,
+    invoiceStatus: invoiceStatusOf(periodSource.invoiceStatus),
   } : null
   if (commercialPeriod && !commercialPeriod.kind) return null
   const actionSource = source.actions == null ? null : record(source.actions)
@@ -312,6 +319,15 @@ export function parseSubscription(value: unknown): ClubSubscription | null {
     requestedPlan,
     commercialPeriod,
     actions,
+  }
+}
+
+
+export function invoiceNotice(period: CommercialPeriod | null | undefined): { title: string; body: string } | null {
+  if (!period || period.kind !== 'PAID' || period.invoiceStatus !== 'PENDING') return null
+  return {
+    title: 'Factura pendiente',
+    body: 'Tu plan ya está activo. La factura se emite después del cobro y no bloquea el uso del plan.',
   }
 }
 

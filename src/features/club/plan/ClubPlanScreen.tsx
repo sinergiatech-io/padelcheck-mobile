@@ -25,6 +25,7 @@ import {
   capabilityLines,
   catalogMaterial,
   chargeBanner,
+  invoiceNotice,
   chargeMaterial,
   completeChoice,
   conflictOutcome,
@@ -489,9 +490,11 @@ export function ClubPlanScreen() {
   )
   const explainsRequestedPlan = plan.charge?.planCode === plan.subscription?.requestedPlan?.planCode &&
     (paymentCheck === 'checking' || paymentResult === 'pending' || paymentResult === 'activated')
+  const invoice = invoiceNotice(plan.subscription?.commercialPeriod)
   const banners = [
     ...(plan.usageError ? [{ tone: 'error' as const, title: 'No pudimos cargar el uso', body: 'No hay datos de consumo disponibles. Reintentá para consultar los límites y el uso actual.' }] : []),
     ...(pending && !explainsRequestedPlan ? [pending] : []),
+    ...(invoice ? [{ tone: 'info' as const, title: invoice.title, body: invoice.body }] : []),
     ...usageBanners(plan.usage),
   ]
   const primary = primaryAction(plan.subscription, canManage)
