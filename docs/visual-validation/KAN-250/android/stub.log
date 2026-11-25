@@ -1,0 +1,26 @@
+starting stub 
+[2026-11-24T14:23:56.863Z] KAN-250 stub listening on 127.0.0.1:8080
+[2026-11-24T14:24:05.744Z] GET /__qa/state
+[2026-11-24T14:28:08.891Z] POST /api/auth/login
+[2026-11-24T14:28:44.227Z] GET /api/auth/me
+[2026-11-24T14:28:44.242Z] GET /api/clubs/3751a033-4572-461b-8233-630d3bc9152b/events
+[2026-11-24T14:28:44.776Z] GET /api/clubs/3751a033-4572-461b-8233-630d3bc9152b/billing/subscription
+[2026-11-24T14:28:44.796Z] GET /api/clubs/3751a033-4572-461b-8233-630d3bc9152b/billing/usage
+[2026-11-24T14:29:22.838Z] POST /__qa/state
+[2026-11-24T14:29:22.839Z] state=issued
+[2026-11-24T14:29:23.918Z] GET /api/clubs/3751a033-4572-461b-8233-630d3bc9152b/events
+[2026-11-24T14:29:24.450Z] GET /api/clubs/3751a033-4572-461b-8233-630d3bc9152b/billing/subscription
+[2026-11-24T14:29:24.473Z] GET /api/clubs/3751a033-4572-461b-8233-630d3bc9152b/billing/usage
+[2026-11-24T14:29:46.225Z] POST /__qa/state
+[2026-11-24T14:29:46.225Z] state=absent
+[2026-11-24T14:29:47.302Z] GET /api/clubs/3751a033-4572-461b-8233-630d3bc9152b/events
+[2026-11-24T14:29:47.821Z] GET /api/clubs/3751a033-4572-461b-8233-630d3bc9152b/billing/subscription
+[2026-11-24T14:29:47.840Z] GET /api/clubs/3751a033-4572-461b-8233-630d3bc9152b/billing/usage
+[2026-11-24T14:30:03.088Z] POST /__qa/state
+[2026-11-24T14:30:03.088Z] state=courtesy
+[2026-11-24T14:30:04.151Z] GET /api/clubs/3751a033-4572-461b-8233-630d3bc9152b/events
+[2026-11-24T14:30:04.685Z] GET /api/clubs/3751a033-4572-461b-8233-630d3bc9152b/billing/subscription
+[2026-11-24T14:30:04.705Z] GET /api/clubs/3751a033-4572-461b-8233-630d3bc9152b/billing/usage
+[2026-11-24T14:30:27.591Z] GET /api/clubs/3751a033-4572-461b-8233-630d3bc9152b/events
+[2026-11-24T14:30:28.115Z] GET /api/clubs/3751a033-4572-461b-8233-630d3bc9152b/billing/subscription
+[2026-11-24T14:30:28.136Z] GET /api/clubs/3751a033-4572-461b-8233-630d3bc9152b/billing/usage

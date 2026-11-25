@@ -362,6 +362,34 @@ test('the same context joins one refresh and a revoked context clears it', async
   assert.equal(session.snapshot().loading, false)
 })
 
+test('refresh keeps a pending invoice on a recoverable failure and clears it after access is revoked', async () => {
+  let failure = null
+  const session = createPlanReads({
+    loadAttempt: async () => null,
+    saveAttempt: async () => {},
+    events: async () => [],
+    charge: async () => { throw new Error('Unexpected charge read') },
+    subscription: async (clubId) => {
+      if (failure) throw failure
+      return { ...subscriptionBody(clubId), commercialPeriod: { kind: 'PAID', invoiceStatus: 'PENDING' } }
+    },
+    usage: async (clubId) => usageBody(clubId),
+  })
+  const context = { clubId: 'club-a', userId: 'user', listEvents: false, enabled: true }
+  await session.refresh(context)
+  failure = { kind: 'network' }
+  let snapshot = await session.refresh(context)
+  assert.equal(snapshot.error, 'network')
+  assert.equal(snapshot.subscription.commercialPeriod.invoiceStatus, 'PENDING')
+  assert.equal(snapshot.refreshing, false)
+  failure = { status: 403 }
+  snapshot = await session.refresh(context)
+  assert.equal(snapshot.forbidden, true)
+  assert.equal(snapshot.subscription, null)
+  assert.equal(snapshot.usage, null)
+  assert.equal(snapshot.refreshing, false)
+})
+
 function eventUsage(clubId, eventId, pairs) {
   return {
     ...usageBody(clubId),
@@ -416,3 +444,35 @@ test('changing tournament hides the previous event until its own usage arrives',
   assert.equal(session.snapshot().subscription.recurrencePaused, false)
 })
 
+
+test('invoice notice appears only for a pending paid period', () => {
+  const missing = plan.parseSubscription(subscription({
+    planCode: 'PRO',
+    commercialPeriod: { kind: 'PAID', medium: 'TRANSFER', planCode: 'PRO', periodStart: '2026-11-01', periodEnd: '2026-12-01', open: true },
+  }))
+  assert.equal(missing.commercialPeriod.invoiceStatus, 'ABSENT')
+  assert.equal(plan.invoiceNotice(missing.commercialPeriod), null)
+
+  const pending = plan.parseSubscription(subscription({
+    planCode: 'PRO',
+    commercialPeriod: { kind: 'PAID', medium: 'TRANSFER', planCode: 'PRO', periodStart: '2026-11-01', periodEnd: '2026-12-01', open: true, invoiceStatus: 'PENDING' },
+  }))
+  assert.equal(pending.commercialPeriod.invoiceStatus, 'PENDING')
+  assert.deepEqual(plan.invoiceNotice(pending.commercialPeriod), {
+    title: 'Factura pendiente de emisión',
+    body: 'El pago está confirmado y tu plan ya está activo. La factura ARCA pendiente no limita el uso del plan.',
+  })
+
+  const issued = plan.parseSubscription(subscription({
+    planCode: 'PRO',
+    commercialPeriod: { kind: 'PAID', medium: 'TRANSFER', planCode: 'PRO', periodStart: '2026-11-01', periodEnd: '2026-12-01', open: true, invoiceStatus: 'ISSUED' },
+  }))
+  assert.equal(issued.commercialPeriod.invoiceStatus, 'ISSUED')
+  assert.equal(plan.invoiceNotice(issued.commercialPeriod), null)
+
+  const courtesy = plan.parseSubscription(subscription({
+    planCode: 'PRO',
+    commercialPeriod: { kind: 'COURTESY', medium: 'COURTESY', planCode: 'PRO', periodStart: '2026-11-01', periodEnd: null, open: true, invoiceStatus: 'PENDING' },
+  }))
+  assert.equal(plan.invoiceNotice(courtesy.commercialPeriod), null)
+})
