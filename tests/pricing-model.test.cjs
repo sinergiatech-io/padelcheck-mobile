@@ -132,11 +132,17 @@ test('scroll offsets map to the offer in focus and clamp at the end', () => {
 test('catalog loader reuses an in-flight read and ignores results after dispose', async () => {
   let calls = 0
   let resolve
-  const loader = model.createCatalogLoader(() => { calls += 1; return new Promise((done) => { resolve = done }) })
+  let signal
+  const loader = model.createCatalogLoader((currentSignal) => {
+    signal = currentSignal
+    calls += 1
+    return new Promise((done) => { resolve = done })
+  })
   const published = []
   const first = loader.load((result) => published.push(result))
   const second = loader.load((result) => published.push(result))
   assert.equal(first, second)
+  await Promise.resolve()
   assert.equal(calls, 1)
   assert.equal(loader.busy, true)
   resolve([FREE, PRO, ELITE])
@@ -146,14 +152,19 @@ test('catalog loader reuses an in-flight read and ignores results after dispose'
   assert.equal(loader.busy, false)
 
   const late = loader.load((result) => published.push(result))
+  await Promise.resolve()
   loader.dispose()
+  assert.equal(signal.aborted, true)
   resolve([])
   await late
   assert.equal(published.length, 1)
 
-  // A remount after dispose (React StrictMode) starts a fresh read that does publish.
+  // A synchronous setup/cleanup/setup (React StrictMode) starts only the live read.
+  const skipped = loader.load((result) => published.push(result))
+  loader.dispose()
   const again = loader.load((result) => published.push(result))
-  assert.notEqual(again, late)
+  await skipped
+  assert.equal(calls, 3)
   resolve([FREE])
   await again
   assert.equal(published.length, 2)

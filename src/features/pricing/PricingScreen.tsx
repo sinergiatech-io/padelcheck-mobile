@@ -321,8 +321,13 @@ export function PricingScreen() {
             {empty && <Banner tone="warning" title="No hay planes disponibles" detail="Por el momento no hay planes para mostrar. Intentá nuevamente más tarde." />}
             {data?.status === 'incomplete' && <Banner tone="warning" title="Información incompleta" detail="Algunos datos no están disponibles. Las ofertas sin datos no se pueden elegir por ahora." />}
             {catalog.refreshFailed && <Banner tone="error" title="No pudimos actualizar los planes" detail="Mostramos la última información disponible. Revisá tu conexión e intentá nuevamente." />}
-            {(catalog.phase === 'error' || empty) && <PrimaryAction label="Reintentar" onPress={catalog.retry} />}
-            {catalog.refreshFailed && <PrimaryAction label="Reintentar" disabled={refreshing} onPress={() => void onRefresh()} />}
+            {(catalog.phase === 'error' || empty || data?.status === 'incomplete' || catalog.refreshFailed) && (
+              <PrimaryAction
+                label="Reintentar"
+                disabled={refreshing}
+                onPress={data ? () => void onRefresh() : catalog.retry}
+              />
+            )}
           </View>
 
           {showStrip && (

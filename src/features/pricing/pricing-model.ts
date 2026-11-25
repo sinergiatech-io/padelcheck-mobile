@@ -243,29 +243,35 @@ export const INITIAL_CATALOG_STATE: CatalogState = { phase: 'loading', catalog: 
  * Serialises catalog reads: a request already in flight is reused instead of duplicated, and only the
  * latest started request may publish its result, so a late response never replaces newer data.
  */
-export function createCatalogLoader(fetchCatalog: (signal?: AbortSignal) => Promise<unknown>) {
+export function createCatalogLoader(fetchCatalog: (signal: AbortSignal) => Promise<unknown>) {
   let running: Promise<void> | null = null
-  let generation = 0
+  let controller: AbortController | null = null
   return {
     load(publish: (result: { ok: true; catalog: PricingCatalog } | { ok: false }) => void): Promise<void> {
       if (running) return running
-      const mine = ++generation
-      const task = (async () => {
+      const request = new AbortController()
+      controller = request
+      // Let a synchronous effect cleanup (such as StrictMode) cancel before starting the request.
+      running = Promise.resolve().then(async () => {
         try {
-          const catalog = parsePricingCatalog(await fetchCatalog())
-          if (mine === generation) publish(catalog ? { ok: true, catalog } : { ok: false })
+          if (request.signal.aborted) return
+          const catalog = parsePricingCatalog(await fetchCatalog(request.signal))
+          if (!request.signal.aborted) publish(catalog ? { ok: true, catalog } : { ok: false })
         } catch {
-          if (mine === generation) publish({ ok: false })
+          if (!request.signal.aborted) publish({ ok: false })
         } finally {
-          if (mine === generation) running = null
+          if (controller === request) {
+            controller = null
+            running = null
+          }
         }
-      })()
-      running = task
-      return task
+      })
+      return running
     },
     /** Invalidates any in-flight result (e.g. on unmount); the next load starts a fresh read. */
     dispose() {
-      generation += 1
+      controller?.abort()
+      controller = null
       running = null
     },
     get busy() {

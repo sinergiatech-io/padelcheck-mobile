@@ -11,7 +11,9 @@ const TIMEOUT_MS = 20000
 export function usePlanCatalog() {
   const [state, setState] = useState<CatalogState>(INITIAL_CATALOG_STATE)
   const loader = useRef<ReturnType<typeof createCatalogLoader> | null>(null)
-  if (!loader.current) loader.current = createCatalogLoader(() => apiClient.get<unknown>('/plans', { timeoutMs: TIMEOUT_MS }))
+  if (!loader.current) loader.current = createCatalogLoader((signal) => apiClient.get<unknown>('/plans', {
+    timeoutMs: TIMEOUT_MS, signal, headers: { 'Cache-Control': 'no-cache' },
+  }))
 
   const read = useCallback((keepVisible: boolean) => {
     const current = loader.current
