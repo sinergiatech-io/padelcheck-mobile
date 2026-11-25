@@ -135,7 +135,7 @@ export function createPlanReads(client: PlanReadClient): PlanReads {
     emit()
   }
 
-  function reset() {
+  function reset(forbidden = false) {
     epoch += 1
     request += 1
     flight = null
@@ -143,7 +143,7 @@ export function createPlanReads(client: PlanReadClient): PlanReads {
     events = []
     reference = null
     hasData = false
-    publish(blank())
+    publish({ ...blank(), forbidden })
   }
 
   function invalidate() {
@@ -220,18 +220,11 @@ export function createPlanReads(client: PlanReadClient): PlanReads {
     } catch (failure) {
       if (!live()) return snapshot
       const kind = failureKind(failure)
-      if (kind === 'unauthorized') {
-        publish({ ...snapshot, loading: false, refreshing: false, fresh: false })
+      if (kind === 'unauthorized' || kind === 'forbidden') {
+        reset(kind === 'forbidden')
         return snapshot
       }
-      if (kind === 'forbidden') {
-        publish({ ...snapshot, loading: false, refreshing: false, forbidden: true, error: null, fresh: false })
-        return snapshot
-      }
-      const problem = panelError(kind)
-      publish(keep
-        ? { ...snapshot, loading: false, refreshing: false, usageError: problem, fresh: false }
-        : { ...snapshot, loading: false, refreshing: false, error: problem, fresh: false })
+      publish({ ...snapshot, loading: false, refreshing: false, error: panelError(kind), fresh: false })
     }
     return snapshot
   }

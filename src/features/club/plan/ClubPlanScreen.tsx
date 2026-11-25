@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, AppState, BackHandler, Linking, Pressable, Text, View } from 'react-native'
+import { ActivityIndicator, AppState, BackHandler, Image, Linking, Pressable, Text, View } from 'react-native'
 import { Redirect, router, useFocusEffect, useLocalSearchParams, type Href } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
@@ -62,11 +62,13 @@ function ClockIcon() {
   </Svg>
 }
 
-function Banner({ tone, title, body, checking, onCheck }: { tone: 'info' | 'warning' | 'neutral' | 'error' | 'success'; title: string; body: string; checking?: boolean; onCheck?: () => void }) {
+function Banner({ tone, title, body, checking, onCheck, iconAsset }: { tone: 'info' | 'warning' | 'neutral' | 'error' | 'success'; title: string; body: string; checking?: boolean; onCheck?: () => void; iconAsset?: number }) {
   const palette = tone === 'error' ? ['#fdecec', '#fac5c5'] : tone === 'warning' ? ['#fef5e7', '#fce1b3'] : tone === 'success' ? ['#e9f9ef', '#baedcd'] : tone === 'info' ? ['#ebf3fe', '#c2d8fc'] : ['#fefefe', '#e7e7e8']
   const icon = tone === 'error' ? 'error' : tone === 'warning' ? 'warning' : 'info'
-  return <View accessibilityRole={tone === 'error' ? 'alert' : undefined} style={{ flexDirection: 'row', gap: 12, padding: 12, borderRadius: 12, borderWidth: 1, backgroundColor: palette[0], borderColor: palette[1] }}>
-    {checking ? <ActivityIndicator size="small" color="#3676E0" /> : tone === 'success' ? <SvgXml xml={successXml} width={20} height={20} /> : <Icon name={icon} />}
+  return <View accessibilityRole={tone === 'error' ? 'alert' : undefined} style={{ flexDirection: 'row', gap: 12, padding: 12, borderRadius: iconAsset ? 8 : 12, borderWidth: 1, backgroundColor: palette[0], borderColor: palette[1] }}>
+    {iconAsset ? <View style={{ width: 24, alignSelf: 'center', alignItems: 'center' }}>
+      <Image source={iconAsset} style={{ width: 20, height: 20 }} accessible={false} />
+    </View> : checking ? <ActivityIndicator size="small" color="#3676E0" /> : tone === 'success' ? <SvgXml xml={successXml} width={20} height={20} /> : <Icon name={icon} />}
     <View accessibilityLiveRegion="polite" style={{ flex: 1, gap: 2 }}>
       <Text className="font-inter-600" style={{ fontSize: 14, lineHeight: 20, color: '#120f18' }}>{title}</Text>
       <Text className="font-sans" style={{ fontSize: 12, lineHeight: 16, color: '#605e64' }}>{body}</Text>
@@ -94,8 +96,15 @@ function failureCopy(kind: string | null): string {
 }
 
 export function ClubPlanScreen() {
-  const { user, destination: authenticatedDestination, phase } = useAuth()
+  const auth = useAuth()
+  const { user, destination: authenticatedDestination, phase } = auth
   const destination = authenticatedDestination ?? (phase === 'checking' && user ? resolveAccessDestination(user.accessContexts) : null)
+  const clubId = destination?.kind === 'club' ? destination.clubId : ''
+  return <ClubPlanSession key={`${user?.userId ?? ''}:${clubId}`} auth={auth} destination={destination} />
+}
+
+function ClubPlanSession({ auth, destination }: { auth: ReturnType<typeof useAuth>; destination: ReturnType<typeof useAuth>['destination'] }) {
+  const { user, phase } = auth
   const { paymentReturn } = useLocalSearchParams<{ paymentReturn?: string }>()
   const context = destination?.kind === 'club' ? user?.accessContexts?.find(item => item.activity === 'CLUB' && item.clubId === destination.clubId) : null
   const permissions = context?.permissions ?? []
@@ -490,11 +499,10 @@ export function ClubPlanScreen() {
   )
   const explainsRequestedPlan = plan.charge?.planCode === plan.subscription?.requestedPlan?.planCode &&
     (paymentCheck === 'checking' || paymentResult === 'pending' || paymentResult === 'activated')
-  const invoice = invoiceNotice(plan.subscription?.commercialPeriod)
+  const invoice = invoiceNotice(plan.subscription?.commercialPeriod, plan.subscription?.planCode)
   const banners = [
     ...(plan.usageError ? [{ tone: 'error' as const, title: 'No pudimos cargar el uso', body: 'No hay datos de consumo disponibles. Reintentá para consultar los límites y el uso actual.' }] : []),
     ...(pending && !explainsRequestedPlan ? [pending] : []),
-    ...(invoice ? [{ tone: 'info' as const, title: invoice.title, body: invoice.body }] : []),
     ...usageBanners(plan.usage),
   ]
   const primary = primaryAction(plan.subscription, canManage)
@@ -522,13 +530,18 @@ export function ClubPlanScreen() {
         <RefreshableScrollView refreshing={refresh.refreshing || plan.refreshing} onRefresh={refresh.onRefresh} style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, padding: 16, gap: 16 }} alwaysBounceVertical>
           {plan.loading && !headline ? <View accessibilityLabel="Cargando plan">{[0, 1, 2, 3].map(item => <View key={item} style={{ height: 72, borderRadius: 12, backgroundColor: '#dfdfdf', marginBottom: 12 }} />)}</View> : null}
           {plan.forbidden ? <Banner tone="error" title="Sin permiso" body="No tenés permiso para consultar el plan de este club." /> : null}
-          {plan.error ? <Banner tone="error" title="No pudimos cargar el plan" body={failureCopy(plan.error)} /> : null}
+          {plan.error ? <Banner
+            tone="error"
+            title={headline ? 'No pudimos actualizar el plan' : 'No pudimos cargar el plan'}
+            body={headline ? 'Conservamos la última lectura. Reintentá para actualizar el plan y el uso.' : failureCopy(plan.error)}
+          /> : null}
           {headline ? <View style={{ backgroundColor: '#fefefe', borderRadius: 12, padding: 16, gap: 8 }}>
             <Text className="font-inter-600" style={{ fontSize: 24, lineHeight: 32, color: '#120f18' }}>{headline.title}</Text>
             <Text className="font-inter-600" style={{ fontSize: 14, lineHeight: 20, color: '#120f18' }}>{headline.status}</Text>
             {headline.identity ? <Text className="font-sans" style={{ fontSize: 12, lineHeight: 16, color: '#605e64' }}>{headline.identity}</Text> : null}
             <Text className="font-sans" style={{ fontSize: 12, lineHeight: 16, color: '#605e64' }}>{headline.limitsReady ? 'Límites vigentes del club' : 'No pudimos consultar los límites vigentes.'}</Text>
           </View> : null}
+          {invoice ? <Banner tone="info" {...invoice} iconAsset={require('./invoice-clock.png')} /> : null}
           {paymentNotice ? <Banner {...paymentNotice} checking={paymentCheck === 'checking'} onCheck={canCheckPayment ? () => checkPayment.current() : undefined} /> : null}
           {plan.subscription?.recurrenceMessage ? <Banner tone="info" title="Renovación" body={plan.subscription.recurrenceMessage} /> : null}
           {banners.map(item => <Banner key={item.title + item.body} tone={item.tone} title={item.title} body={item.body} />)}

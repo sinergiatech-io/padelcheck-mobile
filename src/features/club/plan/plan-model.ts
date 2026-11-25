@@ -323,11 +323,12 @@ export function parseSubscription(value: unknown): ClubSubscription | null {
 }
 
 
-export function invoiceNotice(period: CommercialPeriod | null | undefined): { title: string; body: string } | null {
+export function invoiceNotice(period: CommercialPeriod | null | undefined, planCode?: ClubSubscription['planCode']): { title: string; body: string } | null {
   if (!period || period.kind !== 'PAID' || period.invoiceStatus !== 'PENDING') return null
+  const plan = planCode === 'PRO' || planCode === 'ELITE' ? planCode : 'tu plan'
   return {
-    title: 'Factura pendiente',
-    body: 'Tu plan ya está activo. La factura se emite después del cobro y no bloquea el uso del plan.',
+    title: 'Factura pendiente de emisión',
+    body: `El pago está confirmado y ${plan} ya está activo. La factura ARCA pendiente no limita el uso del plan.`,
   }
 }
 
