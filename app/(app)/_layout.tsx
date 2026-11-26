@@ -69,7 +69,9 @@ function AppTabs({ mode }: { mode: 'player' | 'club' }) {
         options={{
           title: 'Eventos',
           href: mode === 'club' ? null : undefined,
-          tabBarIcon: ({ color }) => <BottomNavEventsIcon color={color} size={BOTTOM_NAV_ICON_SIZE} />,
+          tabBarIcon: ({ color }) => mode === 'club'
+            ? <SvgXml xml={venueIcons.navEvents.xml} width={venueIcons.navEvents.width} height={venueIcons.navEvents.height} />
+            : <BottomNavEventsIcon color={color} size={BOTTOM_NAV_ICON_SIZE} />,
         }}
       />
       <Tabs.Screen
