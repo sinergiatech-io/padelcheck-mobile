@@ -14,6 +14,8 @@ import { ROUTES } from '@/lib/constants'
 import { venueIcons } from '../venues/venue-icons'
 
 const icons = { dashboard: venueIcons.navDashboard, events: venueIcons.navEvents, players: venueIcons.navPlayers, club: venueIcons.navClub }
+const eventsActive = Image.resolveAssetSource(require('@/assets/club-events/nav-events-active.svg'))?.uri
+const clubInactiveForEvents = Image.resolveAssetSource(require('@/assets/club-events/nav-club.svg'))?.uri
 const playersActive = Image.resolveAssetSource(require('@/assets/player-profile/nav-players-active.svg'))?.uri
 const clubInactive = Image.resolveAssetSource(require('@/assets/player-profile/nav-club-inactive.svg'))?.uri
 
@@ -31,16 +33,16 @@ interface ClubBottomNavProps {
   onPlayers?: () => void
   bottomInset: number
   busy?: boolean
-  selectedLabel?: 'Jugadores' | 'Mi Club'
+  selectedLabel?: 'Eventos' | 'Jugadores' | 'Mi Club'
 }
 
 /** Explicit dp measurements match the 64px Figma bar, independently of NativeWind rem. */
 export function ClubBottomNav({ onDashboard, onClub, onEvents, onPlayers, bottomInset, busy, selectedLabel = 'Mi Club' }: ClubBottomNavProps) {
   const items = [
     { label: 'Dashboard', icon: icons.dashboard, onPress: onDashboard },
-    { label: 'Eventos', icon: icons.events, onPress: onEvents },
+    { label: 'Eventos', icon: icons.events, uri: selectedLabel === 'Eventos' ? eventsActive : undefined, onPress: onEvents ?? (() => router.replace('/club/events' as Href)) },
     { label: 'Jugadores', icon: icons.players, uri: selectedLabel === 'Jugadores' ? playersActive : undefined, onPress: onPlayers },
-    { label: 'Mi Club', icon: icons.club, uri: selectedLabel === 'Jugadores' ? clubInactive : undefined, onPress: onClub },
+    { label: 'Mi Club', icon: icons.club, uri: selectedLabel === 'Eventos' ? clubInactiveForEvents : selectedLabel === 'Jugadores' ? clubInactive : undefined, onPress: onClub },
   ]
   return (
     <View style={{ paddingBottom: bottomInset, backgroundColor: '#120F18' }}>
