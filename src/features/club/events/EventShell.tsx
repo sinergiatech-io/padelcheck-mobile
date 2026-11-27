@@ -10,6 +10,7 @@ import { RefreshableScrollView } from '@/components/ui/refreshable-scroll-view'
 import { StartupReady } from '@/features/startup/StartupReady'
 import { ClubBottomNav } from '../category-policy/ClubBottomNav'
 import { venueIcons } from '../venues/venue-icons'
+import { singleFlight } from './division-model'
 
 /** Shared chrome of the club event screens (list, hub, wizard and category screens). */
 export const eventIcons = {
@@ -72,19 +73,10 @@ export function Shell({ title, children, footer, back, headerAction, hub = false
   </SafeAreaView></StartupReady>
 }
 export function useManualRefresh(refetch: () => Promise<unknown>) {
-  const pending = useRef(false)
   const [refreshing, setRefreshing] = useState(false)
-  async function refresh() {
-    if (pending.current) return
-    pending.current = true
-    setRefreshing(true)
-    try {
-      await refetch()
-    } finally {
-      pending.current = false
-      setRefreshing(false)
-    }
-  }
+  const latest = useRef(refetch)
+  latest.current = refetch
+  const [refresh] = useState(() => singleFlight(() => latest.current(), setRefreshing))
   return { refreshing, onRefresh: () => void refresh() }
 }
 export function Notice({ children, error = false, success = false }: { children: ReactNode; error?: boolean; success?: boolean }) {

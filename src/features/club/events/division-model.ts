@@ -342,3 +342,24 @@ export function withoutLocalId(division: WizardDivision): DivisionWrite {
   delete write.localId
   return write as DivisionWrite
 }
+
+/**
+ * Pull-to-refresh guard (MN3): repeated gestures while a refresh is in flight do not start new requests,
+ * and the indicator always stops, on success and on error.
+ */
+export function singleFlight(run: () => Promise<unknown>, setRefreshing: (refreshing: boolean) => void) {
+  let pending = false
+  return async () => {
+    if (pending) return
+    pending = true
+    setRefreshing(true)
+    try {
+      await run()
+    } catch {
+      // Errors are surfaced by each query (visible data stays, retry offered); the gesture only owns the indicator.
+    } finally {
+      pending = false
+      setRefreshing(false)
+    }
+  }
+}

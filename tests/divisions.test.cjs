@@ -90,3 +90,14 @@ test('moving back from the review reopens the last batch instead of duplicating 
  assert.equal(m.resumePlan({...plan,lastBatch:['gone']}).editing,null)
  assert.deepEqual(m.withoutLocalId(plan.divisions[0]),{criterion:'SIMPLE',genderType:'MALE',categoryId:'c6',maxPairs:8,substitutesAllowed:true})
 })
+
+test('pull-to-refresh: repeated gestures share one request and the indicator stops on success and error',async()=>{
+ const states=[];let calls=0;let release
+ const refresh=m.singleFlight(()=>{calls++;return new Promise(r=>{release=r})},v=>states.push(v))
+ const first=refresh();await refresh();await refresh()
+ assert.equal(calls,1);release();await first
+ assert.deepEqual(states,[true,false])
+ const failing=m.singleFlight(()=>{calls++;return Promise.reject(new Error('500'))},v=>states.push(v))
+ await failing();assert.deepEqual(states.slice(-2),[true,false])
+ await failing();assert.equal(calls,3,'a later gesture retries after an error')
+})
