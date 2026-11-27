@@ -142,6 +142,6 @@ En `android/figma-compare/` cada imagen muestra el frame de Figma, la captura de
 
 - En el paso 1 (KAN-77, fuera de alcance), el teclado tapa el pie «Siguiente» mientras se escribe. Hay que cerrarlo para avanzar.
 - Después de guardar una edición, la categoría editada pasa al final de la lista del hub.
-- No verificado en Android: abrir inscripción (KAN-81) y lectores de pantalla (TalkBack). La captura de pantalla no muestra el teclado numérico del paso 1.
+- No verificado en Android: abrir inscripción (KAN-81), lectores de pantalla (TalkBack) y dispositivos físicos. Las capturas con teclado son de una sola densidad (430 dpi).
 - iOS: solo el bundle exportable (acuerdo del 12/11).
 
