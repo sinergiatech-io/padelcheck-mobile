@@ -95,6 +95,15 @@ export function sumRange(catalog: CatalogCategory[]) {
   return { min: Math.min(...levels) * 2, max: Math.max(...levels) * 2, levels }
 }
 
+/** Suma target state: empty, not an integer / outside the range, or in range but not formable. */
+export function sumProblem(text: string, catalog: CatalogCategory[]): null | 'range' | 'unformable' {
+  if (text.trim() === '' || validSum(text, catalog)) return null
+  const range = sumRange(catalog)
+  const value = text.trim()
+  if (!range || !/^\d+$/.test(value) || Number(value) < range.min || Number(value) > range.max) return 'range'
+  return 'unformable'
+}
+
 export function validSum(text: string, catalog: CatalogCategory[]) {
   const range = sumRange(catalog)
   if (!range || !/^\d+$/.test(text.trim())) return false
@@ -196,6 +205,27 @@ export function criterionDetail(division: DivisionLike, name: Names) {
 /** Card title, e.g. «Caballeros · 6ta». */
 export function divisionTitle(division: DivisionLike, name: Names) {
   return genderLabels[division.genderType] + ' · ' + criterionDetail(division, name)
+}
+
+/**
+ * Name the service generates when none is sent (docs/division-management-api.md «Generated names»):
+ * Simple keeps the KAN-146 «5TA MALE»; the rest use the readable title, e.g. «Caballeros · Suma 13».
+ */
+export function generatedName(division: Division) {
+  const gender = genderLabels[division.genderType]
+  const label = (code: string | null) => (code ?? '').trim().toLowerCase()
+  switch (division.criterion) {
+    case 'SIMPLE': return (division.categoryCode ?? '') + ' ' + division.genderType
+    case 'SUMA': return gender + ' · Suma ' + division.sumTarget
+    case 'COMBINADO': return gender + ' · ' + label(division.categoryCode) + ' + ' + label(division.secondCategoryCode)
+    case 'OPEN': return gender + ' · OPEN'
+  }
+}
+
+/** Saved division title: the organizer's custom name when there is one, otherwise the card title. */
+export function savedTitle(division: Division) {
+  const custom = division.name?.trim()
+  return custom && custom !== generatedName(division) ? custom : divisionTitle(division, savedNames(division))
 }
 
 /** Card «Tipo» row: Simple, Suma 13, Combinado or OPEN. */

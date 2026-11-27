@@ -101,3 +101,29 @@ test('pull-to-refresh: repeated gestures share one request and the indicator sto
  await failing();assert.deepEqual(states.slice(-2),[true,false])
  await failing();assert.equal(calls,3,'a later gesture retries after an error')
 })
+test('Suma flags targets outside the range and in-range targets two catalog categories cannot form',()=>{
+ assert.equal(m.sumProblem('',catalog),null)
+ assert.equal(m.sumProblem('13',catalog),null)
+ assert.equal(m.sumProblem('17',catalog),'range')
+ assert.equal(m.sumProblem('abc',catalog),'range')
+ const gapped=catalog.filter(c=>['6TA','8VA'].includes(c.code))
+ assert.equal(m.sumProblem('13',gapped),'unformable')
+ assert.equal(m.sumProblem('14',gapped),null)
+ assert.deepEqual(catalog.map(m.categoryLevel),[1,2,3,4,5,6,7,8])
+})
+test('saved titles follow the generated server name and keep custom names; Combinado may repeat a category',()=>{
+ const base={id:'d',eventId:'e',categoryId:null,categoryCode:null,categoryName:null,secondCategoryId:null,secondCategoryCode:null,secondCategoryName:null,sumTarget:null,maxPairs:8,substitutesAllowed:true,status:'DRAFT',cancelledAt:null}
+ const suma={...base,criterion:'SUMA',sumTarget:13,genderType:'MALE',name:'Caballeros · Suma 13'}
+ assert.equal(m.generatedName(suma),'Caballeros · Suma 13'); assert.equal(m.savedTitle(suma),'Caballeros · Suma 13')
+ const twice={...base,criterion:'COMBINADO',genderType:'FEMALE',categoryId:'c6',categoryCode:'6TA',categoryName:'6ta',secondCategoryId:'c6',secondCategoryCode:'6TA',secondCategoryName:'6ta',name:'Damas · 6ta + 6ta'}
+ assert.equal(m.generatedName(twice),'Damas · 6ta + 6ta'); assert.equal(m.savedTitle(twice),'Damas · 6ta + 6ta')
+ const mixed={...twice,genderType:'MIXED',secondCategoryId:'c7',secondCategoryCode:'7MA',secondCategoryName:'7ma',name:'Mixto · 6ta + 7ma'}
+ assert.equal(m.savedTitle(mixed),'Mixto · 6ta + 7ma')
+ assert.equal(m.savedTitle({...suma,name:'Suma libre de verano'}),'Suma libre de verano')
+ const simple={...base,criterion:'SIMPLE',genderType:'MALE',categoryId:'c5',categoryCode:'5TA',categoryName:'5ta',name:'5TA MALE'}
+ assert.equal(m.savedTitle(simple),'Caballeros · 5ta')
+ assert.equal(m.savedTitle({...base,criterion:'OPEN',genderType:'MIXED',name:'Mixto · OPEN'}),'Mixto · OPEN')
+ assert.equal(m.validCriterion(selection({type:'COMBINADO',first:'c6',second:'c6'}),catalog),true)
+ assert.deepEqual(m.toWrites(selection({type:'COMBINADO',first:'c6',second:'c6',maxPairsText:'8',substitutesAllowed:true})).map(w=>[w.categoryId,w.secondCategoryId]),[['c6','c6']])
+ assert.equal(m.divisionTitle(m.toWrites(selection({type:'COMBINADO',first:'c6',second:'c6',maxPairsText:'8',substitutesAllowed:true}))[0],name),'Caballeros · 6ta + 6ta')
+})

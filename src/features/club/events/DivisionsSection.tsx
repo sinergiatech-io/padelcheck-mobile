@@ -6,8 +6,8 @@ import { useAuth } from '@/context/AuthContext'
 import { EventIcon, ROOT, Shell, push, replace, s } from './EventShell'
 import { divisionApi } from './division-api'
 import {
-  activeDivisions, catalogNames, criterionLabel, divisionTitle, divisionWrite, emptySelection, errorCode, limitReason, planLimitRemaining,
-  remainingQuota, savedCatalog, savedNames, selectionSize, selectionSummary, toSelection, toWrites, validCriterion, validMaxPairs,
+  activeDivisions, catalogNames, savedTitle, criterionLabel, divisionTitle, divisionWrite, emptySelection, errorCode, limitReason, planLimitRemaining,
+  remainingQuota, savedCatalog, selectionSize, selectionSummary, toSelection, toWrites, validCriterion, validMaxPairs,
   validSelection, type Division, type Selection,
 } from './division-model'
 import { Banner, CardAction, CardActions, CatalogState, CriterionFields, DivisionCard, LimitBanner, QuotaFields, d } from './division-ui'
@@ -84,7 +84,7 @@ export function DivisionsSection({ clubId, event }: { clubId: string; event: Clu
       {editable && <Text className="font-sans" style={s.categoryHint}>Agregá una categoría para publicar el evento o abrir la inscripción.</Text>}
     </View>}
     {active.map(division => {
-      const title = divisionTitle(division, savedNames(division))
+      const title = savedTitle(division)
       return <View key={division.id} style={d.gap8}>
         <DivisionCard title={title} maxPairs={division.maxPairs} type={criterionLabel(division)} substitutes={division.substitutesAllowed} />
         <CardActions>
@@ -97,7 +97,7 @@ export function DivisionsSection({ clubId, event }: { clubId: string; event: Clu
     })}
     {history.length > 0 && <View style={s.gap}>
       <Text accessibilityRole="header" className="font-inter-600" style={d.muted}>Canceladas</Text>
-      {history.map(division => <DivisionCard key={division.id} muted title={divisionTitle(division, savedNames(division))} maxPairs={division.maxPairs}
+      {history.map(division => <DivisionCard key={division.id} muted title={savedTitle(division)} maxPairs={division.maxPairs}
         type={criterionLabel(division)} substitutes={division.substitutesAllowed}
         footer={<View style={{ borderTopWidth: 1, borderTopColor: '#e7e7e8', paddingHorizontal: 16, paddingVertical: 12 }}>
           <Text className="font-inter-600" style={[d.label, { color: '#b51e15' }]}>Categoría cancelada</Text>
@@ -145,7 +145,7 @@ function CancelDivisionDialog({ clubId, eventId, division, close, done }: {
         <Pressable accessibilityRole="button" accessibilityLabel="Cerrar" accessibilityState={{ disabled: busy }} disabled={busy} onPress={close}><EventIcon name="modalClose" /></Pressable>
       </View>
       <View style={s.dialogContent}>
-        <Text className="font-inter-600" style={s.strong}>{divisionTitle(division, savedNames(division))}</Text>
+        <Text className="font-inter-600" style={s.strong}>{savedTitle(division)}</Text>
         <Text className="font-sans" style={d.muted}>Se conservará su historial y las demás categorías del evento no se modificarán.</Text>
         {busy && <Banner tone="loading" title="Cancelando categoría">Esperá a que termine la operación.</Banner>}
         {error && <Banner tone="error" title="No pudimos cancelar">La categoría sigue activa. Volvé a intentar.</Banner>}
@@ -206,7 +206,7 @@ function DivisionView({ event, division, leave }: { event: ClubEventDetail; divi
   useBack(leave)
   return <Shell title="Consultar división" wizard back={leave} footer={<Button style={s.button} onPress={leave}>Volver al evento</Button>}>
     <Text className="font-sans" style={d.hint}>{division.status === 'CANCELLED' ? 'Categoría cancelada' : statusLabels[event.status]}</Text>
-    <Text accessibilityRole="header" className="font-inter-700" style={{ fontSize: 20, lineHeight: 28, color: '#120f18' }}>{divisionTitle(division, savedNames(division))}</Text>
+    <Text accessibilityRole="header" className="font-inter-700" style={{ fontSize: 20, lineHeight: 28, color: '#120f18' }}>{savedTitle(division)}</Text>
     <Text className="font-inter-500" style={d.muted}>{selectionSummary(selection, savedCatalog(division))}</Text>
     <QuotaFields selection={selection} set={() => undefined} touched={false} fixed />
   </Shell>

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { push, s as shell } from './EventShell'
 import { divisionIcons } from './division-icons'
 import {
-  OPEN, genderLabels, gridOrder, sumRange, toggleCategory, typeLabels, validMaxPairs, validSum,
+  OPEN, genderLabels, gridOrder, sumRange, toggleCategory, typeLabels, validMaxPairs, sumProblem,
   type CatalogCategory, type DivisionType, type GenderType, type Selection,
 } from './division-model'
 
@@ -109,7 +109,8 @@ export function CriterionFields({ selection, set, catalog, single = false, onOve
   onOverflow: () => void
 }) {
   const range = sumRange(catalog)
-  const sumInvalid = selection.sumText.trim() !== '' && !validSum(selection.sumText, catalog)
+  const sumIssue = sumProblem(selection.sumText, catalog)
+  const sumInvalid = sumIssue !== null
   const pick = (id: string) => {
     const next = toggleCategory(selection.categoryIds, id, single)
     if (next.length > selection.categoryIds.length && !canAdd(next.length)) {
@@ -146,7 +147,7 @@ export function CriterionFields({ selection, set, catalog, single = false, onOve
           : 'Cada categoría elegida crea una división independiente. Rige la política de categorías del club.'}</Text>
     </View>}
     {selection.type === 'SUMA' && <>
-      <Field label="Suma de categorías" error={sumInvalid && range ? 'Ingresá un entero entre ' + range.min + ' y ' + range.max + '.' : false}>
+      <Field label="Suma de categorías" error={sumIssue === 'unformable' ? 'Esta suma no se puede formar con dos categorías del catálogo.' : sumIssue && range ? 'Ingresá un entero entre ' + range.min + ' y ' + range.max + '.' : false}>
         <Input accessibilityLabel="Suma de categorías" keyboardType="number-pad" style={[shell.field, sumInvalid && d.invalid]}
           value={selection.sumText} onChangeText={sumText => set({ ...selection, sumText })} />
       </Field>
