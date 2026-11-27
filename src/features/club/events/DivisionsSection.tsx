@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/context/AuthContext'
 import { EventIcon, ROOT, Shell, push, replace, s } from './EventShell'
 import { divisionApi } from './division-api'
+import { DivisionRegistration } from './DivisionRegistration'
 import {
   activeDivisions, catalogNames, savedTitle, criterionLabel, divisionTitle, divisionWrite, emptySelection, errorCode, limitReason, planLimitRemaining,
   remainingQuota, savedCatalog, selectionSize, selectionSummary, toSelection, toWrites, validCriterion, validMaxPairs,
@@ -184,7 +185,7 @@ export function DivisionScreen({ clubId, event, divisionId, mode }: {
     </Shell>
   }
   const readOnly = event.status !== 'DRAFT' || division?.status === 'CANCELLED' || mode === 'view'
-  if (division && readOnly) return <DivisionView event={event} division={division} leave={leave} />
+  if (division && readOnly) return <DivisionView clubId={clubId} event={event} division={division} leave={leave} />
   if (!division && event.status !== 'DRAFT') return <Shell title="Agregar división" wizard back={leave}>
     <Banner tone="error" title="El evento ya no está en borrador">Volvé al evento para ver su estado.</Banner>
   </Shell>
@@ -201,13 +202,19 @@ function useBack(handler: () => void) {
   }, [])
 }
 
-function DivisionView({ event, division, leave }: { event: ClubEventDetail; division: Division; leave: () => void }) {
+function DivisionView({ clubId, event, division, leave }: { clubId: string; event: ClubEventDetail; division: Division; leave: () => void }) {
   const selection = toSelection([divisionWrite(division)])
+  const admin = useAdmin(clubId)
+  const showRegistration = division.status !== 'CANCELLED' &&
+    (event.status === 'INSCRIPTION_OPEN' || event.status === 'INSCRIPTION_CLOSED')
   useBack(leave)
   return <Shell title="Consultar división" wizard back={leave} footer={<Button style={s.button} onPress={leave}>Volver al evento</Button>}>
     <Text className="font-sans" style={d.hint}>{division.status === 'CANCELLED' ? 'Categoría cancelada' : statusLabels[event.status]}</Text>
     <Text accessibilityRole="header" className="font-inter-700" style={{ fontSize: 20, lineHeight: 28, color: '#120f18' }}>{savedTitle(division)}</Text>
     <Text className="font-inter-500" style={d.muted}>{selectionSummary(selection, savedCatalog(division))}</Text>
+    {showRegistration && <DivisionRegistration key={clubId + '/' + event.id + '/' + division.id}
+      scope={{ clubId, eventId: event.id, divisionId: division.id }}
+      open={event.status === 'INSCRIPTION_OPEN' && division.status === 'INSCRIPTION_OPEN'} admin={admin} />}
     <QuotaFields selection={selection} set={() => undefined} touched={false} fixed />
   </Shell>
 }

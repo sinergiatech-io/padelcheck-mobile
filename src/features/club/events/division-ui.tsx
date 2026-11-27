@@ -24,9 +24,9 @@ function Glyph({ name, size = 20 }: { name: keyof typeof divisionIcons; size?: n
 }
 
 /** «Banner estado» of the UI kit: semantic tone, icon, title and supporting text. */
-export function Banner({ tone, title, children }: { tone: Tone; title: string; children?: ReactNode }) {
+export function Banner({ tone, title, children, icon }: { tone: Tone; title: string; children?: ReactNode; icon?: ReactNode }) {
   return <View accessibilityRole={tone === 'error' ? 'alert' : undefined} accessibilityLiveRegion="polite" style={[d.banner, tones[tone].box]}>
-    <Glyph name={tones[tone].icon} />
+    {icon ?? <Glyph name={tones[tone].icon} />}
     <View style={d.flex}>
       <Text className="font-inter-600" style={d.bannerTitle}>{title}</Text>
       {children ? <Text className="font-sans" style={d.bannerText}>{children}</Text> : null}
