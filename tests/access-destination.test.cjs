@@ -20,6 +20,16 @@ test('only club activity may reach club management routes on both platforms', ()
     assert.equal(guardRedirect(platform, { kind: 'club', clubId: 'c1' }, '/club/settings/other'), platform === 'web' ? '/app' : '/dashboard')
   }
 })
+test('event hub category routes stay reachable for club activity only', () => {
+  for (const platform of ['web', 'native']) {
+    for (const path of ['/club/events/e1/divisions/new', '/club/events/e1/divisions/d1', '/club/events/e1/divisions/d1/edit']) {
+      assert.equal(guardRedirect(platform, { kind: 'club', clubId: 'c1' }, path), null)
+      assert.equal(guardRedirect(platform, { kind: 'player' }, path), platform === 'web' ? '/app/events' : '/events')
+    }
+    for (const path of ['/club/events/e1/divisions', '/club/events/e1/divisions/d1/other'])
+      assert.notEqual(guardRedirect(platform, { kind: 'club', clubId: 'c1' }, path), null)
+  }
+})
 const club = (status = 'UNKNOWN', extra = {}) => ({
   activity: 'CLUB',
   clubId: 'c1',

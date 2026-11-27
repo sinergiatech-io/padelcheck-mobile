@@ -186,7 +186,7 @@ export function accessChoices(contexts: unknown): AccessChoice[] {
 }
 
 function isClubEventsPath(path: string) {
-  return /^\/club\/events(?:\/new|\/[\w-]+(?:\/edit)?)?$/.test(path)
+  return /^\/club\/events(?:\/new|\/[\w-]+(?:\/edit|\/divisions\/(?:new|[\w-]+(?:\/edit)?))?)?$/.test(path)
 }
 
 function registeredPath(platform: AccessPlatform, candidate: string) {

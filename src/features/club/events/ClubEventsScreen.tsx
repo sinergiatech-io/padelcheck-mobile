@@ -1,51 +1,27 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { ActivityIndicator, BackHandler, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { Redirect, router, useLocalSearchParams, type Href } from 'expo-router'
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { StatusBar } from 'expo-status-bar'
-import { SvgUri, SvgXml } from 'react-native-svg'
+import { ActivityIndicator, BackHandler, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Redirect, useLocalSearchParams } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SearchFieldIcon } from '@/components/icons/SearchFieldIcon'
-import { RefreshableScrollView } from '@/components/ui/refreshable-scroll-view'
 import { SessionUnverified } from '@/features/auth/SessionUnverified'
-import { StartupReady } from '@/features/startup/StartupReady'
-import { ClubBottomNav } from '../category-policy/ClubBottomNav'
-import { venueIcons } from '../venues/venue-icons'
-import { categoryCount, hubNotice, statusBackground } from './hub-model'
+import { hubNotice, statusBackground } from './hub-model'
 import { clubEvents } from './event-api'
 import {
   availableInfrastructure, customNotice, eventDates, eventPrice, isCancellable, presets, statusLabels, toggleChoice, toggleVenue,
   validEventDates, validInfrastructure, venueLocation, type ClubEvent, type ClubEventDetail, type EventDraft,
 } from './event-model'
 import { detailKey, listKey, useEventDetail, useEventList, useEventSearch, useEventWizard } from './use-club-events'
+import { Copy, EventIcon, Field, eventIcons, Icon, Notice, ROOT, Retry, Shell, push, replace, s, useManualRefresh } from './EventShell'
+import { DivisionWizard } from './DivisionWizard'
+import { DivisionScreen, DivisionsSection, useHubRefetch } from './DivisionsSection'
+import { initialPlan, resumePlan, type DivisionPlan } from './division-model'
 
-const eventIcons = {
-  hubMenu: Image.resolveAssetSource(require('@/assets/club-events/hub-menu.svg')),
-  hubEmpty: Image.resolveAssetSource(require('@/assets/club-events/hub-empty.svg')),
-  hubCalendarNotice: Image.resolveAssetSource(require('@/assets/club-events/hub-calendar-notice.svg')),
-  hubCancelled: Image.resolveAssetSource(require('@/assets/club-events/hub-cancelled.svg')),
-  menuOpen: Image.resolveAssetSource(require('@/assets/club-events/menu-open.svg')),
-  menuPublish: Image.resolveAssetSource(require('@/assets/club-events/menu-publish.svg')),
-  menuEdit: Image.resolveAssetSource(require('@/assets/club-events/menu-edit.svg')),
-  menuCancel: Image.resolveAssetSource(require('@/assets/club-events/menu-cancel.svg')),
-  modalClose: Image.resolveAssetSource(require('@/assets/club-events/modal-close.svg')),
-  listPin: Image.resolveAssetSource(require('@/assets/club-events/list-pin.svg')),
-  listDate: Image.resolveAssetSource(require('@/assets/club-events/list-date.svg')),
-  listArrow: Image.resolveAssetSource(require('@/assets/club-events/list-arrow.svg')),
-  hubPin: Image.resolveAssetSource(require('@/assets/club-events/hub-pin.svg')),
-  hubDate: Image.resolveAssetSource(require('@/assets/club-events/hub-date.svg')),
-  hubPrice: Image.resolveAssetSource(require('@/assets/club-events/hub-price.svg')),
-}
-const ROOT = '/club/events'
-const replace = (path: string) => router.replace(path as Href)
-const push = (path: string) => router.push(path as Href)
-type Continuation = (draft: EventDraft, back: () => void) => ReactNode
-
-export function ClubEventsScreen({ continuation }: { continuation?: Continuation }) {
+export function ClubEventsScreen() {
   const params = useLocalSearchParams<{ eventId?: string; parts?: string[] }>()
   const { user, destination, phase } = useAuth()
   if (phase === 'checking') return <ActivityIndicator accessibilityLabel="Validando sesión" />
@@ -55,71 +31,16 @@ export function ClubEventsScreen({ continuation }: { continuation?: Continuation
   const clubId = destination.clubId
   const permissions = user?.accessContexts?.find(context => context.activity === 'CLUB' && context.clubId === clubId)?.permissions
   if (!permissions?.includes('MANAGE_TOURNAMENTS')) return <Shell title="Eventos"><Notice error>No tenés permiso para gestionar los eventos de este club.</Notice></Shell>
-  if (params.eventId === 'new') return <Wizard key={clubId} clubId={clubId} continuation={continuation} />
-  if (params.eventId) return <EventScreen key={clubId + ':' + params.eventId} clubId={clubId} eventId={params.eventId}
-    editing={params.parts?.[0] === 'edit'} />
+  if (params.eventId === 'new') return <Wizard key={clubId} clubId={clubId} />
+  const parts = Array.isArray(params.parts) ? params.parts : params.parts ? [params.parts] : []
+  if (params.eventId) return <EventScreen key={clubId + ':' + params.eventId + ':' + parts.join('/')} clubId={clubId} eventId={params.eventId} parts={parts} />
   return <EventList key={clubId} clubId={clubId} />
 }
 
-function Icon({ name }: { name: keyof typeof venueIcons }) {
-  const { xml, width, height } = venueIcons[name]
-  return <SvgXml xml={xml} width={width} height={height} />
-}
 
-function EventIcon({ name }: { name: keyof typeof eventIcons }) {
-  const size = name === 'hubCalendarNotice' || name === 'hubCancelled' ? 20 : 24
-  return <SvgUri uri={eventIcons[name]?.uri ?? null} width={size} height={size} />
-}
 
-function Copy({ children, strong = false, small = false, muted = false }: {
-  children: ReactNode; strong?: boolean; small?: boolean; muted?: boolean
-}) {
-  return <Text className={strong ? 'font-inter-600' : 'font-sans'}
-    style={[s.copy, strong && s.strong, small && s.small, muted && s.muted]}>{children}</Text>
-}
 
-function Shell({ title, children, footer, back, headerAction, hub = false, wizard = false, refresh }: {
-  title: string; children: ReactNode; footer?: ReactNode; back?: () => void; headerAction?: ReactNode; hub?: boolean; wizard?: boolean
-  refresh?: { refreshing: boolean; onRefresh: () => void }
-}) {
-  const insets = useSafeAreaInsets()
-  const { user } = useAuth()
-  const initials = [user?.firstName, user?.lastName].map(name => name?.[0] ?? '').join('')
-  const contentStyle = [s.content, hub && s.hubContent, wizard && s.wizardContent]
-  return <StartupReady><SafeAreaView edges={['top']} style={s.safe}><StatusBar style="light" />
-    <KeyboardAvoidingView style={[s.body, wizard && s.wizardBody]} behavior={wizard && Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={s.header}>
-        {back && <Pressable accessibilityRole="button" accessibilityLabel="Volver" onPress={back} style={s.iconButton}><Icon name="back" /></Pressable>}
-        <Text accessibilityRole="header" className="font-inter-700" numberOfLines={1} style={s.heading}>{title}</Text>
-        {headerAction}
-        {!back && initials !== '' && <View style={s.avatar}><Copy small>{initials}</Copy></View>}
-      </View>
-      {refresh ? <RefreshableScrollView style={s.scroll} contentContainerStyle={contentStyle} alwaysBounceVertical
-        keyboardShouldPersistTaps="handled" refreshing={refresh.refreshing} onRefresh={refresh.onRefresh}>{children}</RefreshableScrollView>
-        : <ScrollView style={s.scroll} contentContainerStyle={contentStyle} keyboardShouldPersistTaps="handled">{children}</ScrollView>}
-      {footer && <View style={[s.footer, wizard && { paddingBottom: Math.max(24, insets.bottom) }]}>{footer}</View>}
-      {!wizard && <ClubBottomNav selectedLabel="Eventos" onDashboard={() => replace('/dashboard')}
-        onClub={() => replace('/club/settings')} bottomInset={insets.bottom} />}
-    </KeyboardAvoidingView>
-  </SafeAreaView></StartupReady>
-}
 
-function useManualRefresh(refetch: () => Promise<unknown>) {
-  const pending = useRef(false)
-  const [refreshing, setRefreshing] = useState(false)
-  async function refresh() {
-    if (pending.current) return
-    pending.current = true
-    setRefreshing(true)
-    try {
-      await refetch()
-    } finally {
-      pending.current = false
-      setRefreshing(false)
-    }
-  }
-  return { refreshing, onRefresh: () => void refresh() }
-}
 
 function EventList({ clubId }: { clubId: string }) {
   const query = useEventList(clubId)
@@ -169,23 +90,23 @@ function EventCard({ event }: { event: ClubEvent }) {
   </View>
 }
 
-function Notice({ children, error = false, success = false }: { children: ReactNode; error?: boolean; success?: boolean }) {
-  return <View accessibilityRole={error ? 'alert' : undefined} accessibilityLiveRegion="polite"
-    style={[s.notice, error ? s.error : success ? s.success : s.warning]}>
-    <Icon name={error ? 'error' : success ? 'check' : 'info'} /><View style={s.flex}><Copy>{children}</Copy></View>
-  </View>
+
+
+/** `parts`: [] hub · ['edit'] · ['divisions', 'new'] · ['divisions', id] · ['divisions', id, 'edit']. */
+function divisionRoute(parts: string[]) {
+  if (parts[0] !== 'divisions' || parts.length < 2 || parts.length > 3) return null
+  if (parts[1] === 'new') return parts.length === 2 ? { divisionId: null, mode: 'new' as const } : null
+  if (parts.length === 3 && parts[2] !== 'edit') return null
+  return { divisionId: parts[1], mode: parts.length === 3 ? 'edit' as const : 'view' as const }
 }
 
-function Retry({ children, retry }: { children: ReactNode; retry: () => void }) {
-  return <View style={s.gap}><Notice error>{children}</Notice>
-    <Button variant="secondary" style={s.soft} onPress={retry}>Reintentar</Button></View>
-}
-
-function EventScreen({ clubId, eventId, editing }: { clubId: string; eventId: string; editing: boolean }) {
+function EventScreen({ clubId, eventId, parts }: { clubId: string; eventId: string; parts: string[] }) {
   const query = useEventDetail(clubId, eventId)
-  const refresh = useManualRefresh(query.refetch)
+  const refresh = useManualRefresh(useHubRefetch(clubId, eventId))
   const event = query.data
-  if (event && editing && event.status === 'DRAFT') return <Wizard clubId={clubId} event={event} />
+  if (event && parts[0] === 'edit' && event.status === 'DRAFT') return <Wizard clubId={clubId} event={event} />
+  const division = divisionRoute(parts)
+  if (event && division) return <DivisionScreen clubId={clubId} event={event} divisionId={division.divisionId} mode={division.mode} />
   const loadError = query.isError && <View style={s.hubGap}>
     <Notice error><Text className="font-inter-600">No pudimos cargar el evento</Text>{'\n'}Volvé a intentar para ver su información.</Notice>
     <Button style={s.button} onPress={() => void query.refetch()}>Reintentar</Button>
@@ -257,16 +178,7 @@ function EventHub({ clubId, event, loadError, refresh }: {
         <Copy small muted>{notice.detail}</Copy></View>
     </View>}
     {event.schedulingMode && <Copy muted>Programación {event.schedulingMode === 'AUTO' ? 'automática' : 'manual'}</Copy>}
-    <View style={s.gap}>
-      <View style={s.categoryHeader}>
-        <Text accessibilityRole="header" className="font-inter-600" style={s.sectionTitle}>Categorías</Text>
-        {event.divisionCount > 0 && <Copy small muted>{categoryCount(event.divisionCount)}</Copy>}
-      </View>
-      {event.divisionCount === 0 && <View style={s.categoriesEmpty}><EventIcon name="hubEmpty" />
-        <Copy muted>Todavía no hay categorías</Copy>
-        {editable && <Text className="font-sans" style={s.categoryHint}>Agregá una categoría para publicar el evento o abrir la inscripción.</Text>}
-      </View>}
-    </View>
+    <DivisionsSection clubId={clubId} event={event} />
     <Modal visible={sheet || confirm} transparent animationType="fade" onRequestClose={() => {
       if (!busy) { setConfirm(false); setSheet(false) }
     }}>
@@ -335,13 +247,14 @@ function Choice({ label, checked, onPress, radio = false, subtitle }: {
   </Pressable>
 }
 
-function Wizard({ clubId, event, continuation }: { clubId: string; event?: ClubEventDetail; continuation?: Continuation }) {
+function Wizard({ clubId, event }: { clubId: string; event?: ClubEventDetail }) {
   const cache = useQueryClient()
   const { step, setStep, draft, setDraft, calendar, preview, infrastructure } = useEventWizard(clubId, event)
   const [showVenues, setShowVenues] = useState(false)
   const [invalid, setInvalid] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(false)
+  const [plan, setPlan] = useState<DivisionPlan>(initialPlan)
   const pending = useRef(false)
   const options = infrastructure.data ?? []
   const selected = options.filter(venue => draft.venueIds.includes(venue.id))
@@ -357,7 +270,7 @@ function Wizard({ clubId, event, continuation }: { clubId: string; event?: ClubE
   useEffect(() => {
     const listener = BackHandler.addEventListener('hardwareBackPress', () => {
       if (pending.current) return true
-      if (step <= 1) return false
+      if (step <= 1 || step >= 4) return false
       setStep(step - 1)
       return true
     })
@@ -375,6 +288,7 @@ function Wizard({ clubId, event, continuation }: { clubId: string; event?: ClubE
       return
     }
     if (!event) {
+      setPlan(current => ({ ...resumePlan(current), step: 4 }))
       setStep(4)
       return
     }
@@ -395,7 +309,7 @@ function Wizard({ clubId, event, continuation }: { clubId: string; event?: ClubE
     }
   }
 
-  if (step === 4 && continuation) return continuation(draft, back)
+  if (step === 4 && !event) return <DivisionWizard clubId={clubId} draft={draft} back={back} plan={plan} setPlan={setPlan} />
   const disabled = step === 2 && !draft.playCalendarPreset || step === 3 &&
     (!infrastructure.data || !validInfrastructure(draft, infrastructure.data))
   return <Shell title={event ? 'Editar evento' : 'Crear evento'} wizard back={back}
@@ -442,84 +356,7 @@ function Wizard({ clubId, event, continuation }: { clubId: string; event?: ClubE
       </>}
       {error && <Notice error>No pudimos guardar el evento. Tus cambios siguen disponibles para reintentar.</Notice>}
     </>}
-    {step === 4 && <><Copy strong>Categorías</Copy><Notice>La configuración de categorías todavía no está disponible.</Notice></>}
   </Shell>
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <View style={{ gap: 8 }}><Text className="font-inter-500" style={s.copy}>{label} <Text style={s.dangerText}>*</Text></Text>{children}</View>
-}
 
-const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#120f18' },
-  body: { flex: 1, backgroundColor: '#f6f6f6' },
-  wizardBody: { backgroundColor: '#fefefe' },
-  header: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#120f18', height: 56, gap: 8, paddingHorizontal: 16 },
-  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#c9cf38', alignItems: 'center', justifyContent: 'center', marginRight: 6 },
-  heading: { color: '#fefefe', fontSize: 20, lineHeight: 28, flex: 1 },
-  iconButton: { width: 32, height: 40, alignItems: 'center', justifyContent: 'center' },
-  scroll: { flex: 1 },
-  content: { flexGrow: 1, gap: 16, paddingHorizontal: 16, paddingVertical: 24 },
-  hubContent: { gap: 28, paddingTop: 20 },
-  hubGap: { gap: 28 },
-  hubSkeleton: { height: 160, borderRadius: 16, backgroundColor: '#dedede' },
-  more: { height: 44, width: 44, alignItems: 'center', justifyContent: 'center' },
-  hubSummary: { padding: 15, gap: 10 },
-  summaryTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
-  hubWarning: { borderColor: '#ffdca8', backgroundColor: '#fcf4e6' },
-  hubNeutral: { borderColor: '#e7e7e8', backgroundColor: '#f6f6f6' },
-  categoryHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  sectionTitle: { fontSize: 18, lineHeight: 28, color: '#120f18' },
-  categoriesEmpty: { alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#dedde0', backgroundColor: '#fefefe', borderRadius: 16, padding: 8 },
-  categoryHint: { maxWidth: 192, fontSize: 12, lineHeight: 16, color: '#605e64' },
-  sheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#120f1866' },
-  sheet: { maxHeight: '85%', borderTopLeftRadius: 20, borderTopRightRadius: 20, backgroundColor: '#fefefe', paddingHorizontal: 20, paddingTop: 8 },
-  handle: { alignSelf: 'center', height: 4, width: 36, borderRadius: 4, backgroundColor: '#c4c3c7', marginBottom: 16 },
-  menuAction: { flexDirection: 'row', alignItems: 'center', gap: 16, minHeight: 62 },
-  menuDivider: { marginTop: 8, borderTopWidth: 1, borderTopColor: '#e7e7e8', paddingTop: 8 },
-  wizardContent: { paddingHorizontal: 32 },
-  footer: { paddingHorizontal: 32, paddingBottom: 24, paddingTop: 16 },
-  button: { height: 48, borderRadius: 8 },
-  soft: { height: 48, borderRadius: 8, borderWidth: 0, backgroundColor: '#f8f8e9' },
-  danger: { height: 48, borderRadius: 8, borderWidth: 0, backgroundColor: '#fdecec' },
-  dangerText: { color: '#b51e15' },
-  copy: { color: '#120f18', fontSize: 14, lineHeight: 20 },
-  strong: { color: '#120f18', fontSize: 16, lineHeight: 24 },
-  small: { fontSize: 12, lineHeight: 16 },
-  muted: { color: '#605e64' },
-  search: { height: 40, borderRadius: 16, borderWidth: 1, borderColor: '#b6b5b7', backgroundColor: '#fefefe', paddingLeft: 47, paddingRight: 16, fontSize: 14 },
-  searchIcon: { position: 'absolute', left: 16, top: 8 },
-  field: { height: 56, borderRadius: 8, borderWidth: 1, borderColor: '#929195', backgroundColor: '#fefefe', paddingHorizontal: 16, fontSize: 14 },
-  gap: { gap: 12 },
-  row: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  flex: { flex: 1 },
-  skeleton: { height: 259, borderRadius: 16, backgroundColor: '#dedede' },
-  empty: { alignItems: 'center', paddingVertical: 48, gap: 16 },
-  eventCard: { borderWidth: 1, borderColor: '#e7e7e8', borderRadius: 16, backgroundColor: '#fefefe', overflow: 'hidden' },
-  cover: { height: 110, alignItems: 'flex-end', padding: 12 },
-  badge: { borderRadius: 8, backgroundColor: '#dedde0', paddingHorizontal: 8, paddingVertical: 4 },
-  openBadge: { backgroundColor: '#c9cf38' },
-  eventContent: { gap: 4, paddingHorizontal: 16, paddingVertical: 8 },
-  edit: { height: 40, width: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff5e7' },
-  linkRow: { flexDirection: 'row', gap: 12, justifyContent: 'space-between', alignItems: 'center', minHeight: 32, marginTop: 8 },
-  link: { color: '#6b7009', fontSize: 14, lineHeight: 20 },
-  notice: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, padding: 12, borderRadius: 8 },
-  info: { borderColor: '#c2d8fc', backgroundColor: '#ebf3fe' },
-  warning: { borderColor: '#ffdca8', backgroundColor: '#fff5e7' },
-  error: { borderColor: '#fac5c5', backgroundColor: '#fdecec' },
-  success: { borderColor: '#baedcd', backgroundColor: '#e9f9ef' },
-  overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 8, backgroundColor: '#0006' },
-  dialog: { width: '100%', maxWidth: 374, borderRadius: 16, backgroundColor: '#fefefe', overflow: 'hidden' },
-  dialogHeader: { minHeight: 52, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#e7e7e8', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  dialogContent: { gap: 16, padding: 16 },
-  choice: { flexDirection: 'row', minHeight: 56, alignItems: 'center', gap: 24, paddingHorizontal: 16 },
-  radio: { minHeight: 64, borderRadius: 12, paddingLeft: 12, paddingRight: 30, backgroundColor: '#fdfdfc' },
-  selected: { backgroundColor: '#f8f8e9' },
-  circle: { borderRadius: 10, width: 20, height: 20, borderWidth: 2, borderColor: '#605e64', alignItems: 'center', justifyContent: 'center' },
-  activeCircle: { borderColor: '#a9b12b' },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#a9b12b' },
-  checkbox: { width: 18, height: 18, borderWidth: 2, borderRadius: 2, borderColor: '#605e64', alignItems: 'center', justifyContent: 'center' },
-  checked: { backgroundColor: '#a9b12b', borderColor: '#a9b12b' },
-  check: { color: '#fff', fontWeight: 'bold', fontSize: 13, lineHeight: 14 },
-  venue: { padding: 12, borderRadius: 16, backgroundColor: '#f6f7f8' },
-})
