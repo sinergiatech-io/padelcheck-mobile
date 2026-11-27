@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { infiniteQueryOptions, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/context/AuthContext'
 import { ApiError, apiClient } from '@/lib/api-client'
 
@@ -29,6 +29,7 @@ export function fetchPlayerPage({ query, gender, categoryId }: Criteria, page: n
 
 export function usePlayerSearch({ query, gender, categoryId }: Criteria) {
   const { user } = useAuth()
+  const queryClient = useQueryClient()
   const text = query.trim()
   const active = text.length >= 2 || Boolean(gender) || Boolean(categoryId)
   const categories = useQuery({
@@ -37,7 +38,7 @@ export function usePlayerSearch({ query, gender, categoryId }: Criteria) {
     staleTime: 60 * 60 * 1000,
     retry: false,
   })
-  const results = useInfiniteQuery({
+  const searchOptions = infiniteQueryOptions({
     queryKey: ['player-search', user?.userId, text, gender, categoryId],
     enabled: active && Boolean(user),
     initialPageParam: 0,
@@ -45,8 +46,20 @@ export function usePlayerSearch({ query, gender, categoryId }: Criteria) {
     queryFn: ({ pageParam, signal }) => fetchPlayerPage({ query: text, gender, categoryId }, pageParam, signal),
     getNextPageParam: page => page.page + 1 < page.totalPages ? page.page + 1 : undefined,
   })
+  const results = useInfiniteQuery(searchOptions)
+
+  async function refreshFirstPage() {
+    if (!searchOptions.enabled) return
+
+    try {
+      await queryClient.fetchInfiniteQuery({ ...searchOptions, pages: 1 })
+    } catch {
+      // The search query exposes the error while retaining its previous pages.
+    }
+  }
+
   const restricted = results.error instanceof ApiError && [401, 403].includes(results.error.status)
-  return { categories, results, active, rows: restricted ? [] : results.data?.pages.flatMap(page => page.items) ?? [] }
+  return { categories, results, active, refreshFirstPage, rows: restricted ? [] : results.data?.pages.flatMap(page => page.items) ?? [] }
 }
 
 export function categoryLabel(player: Player) {

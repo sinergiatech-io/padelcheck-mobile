@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { router } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Search } from 'lucide-react-native'
+import { CircleX, Search } from 'lucide-react-native'
 import { Button } from '@/components/ui/button'
 import { RefreshableScrollView } from '@/components/ui/refreshable-scroll-view'
 import { ArrowForwardIcon } from '@/components/icons/TournamentCardIcons'
@@ -21,10 +21,14 @@ export default function PlayersScreen() {
   const [query, setQuery] = useState('')
   const [gender, setGender] = useState<GenderFilter>()
   const [categoryId, setCategory] = useState<string>()
-  const { categories, results, active, rows } = usePlayerSearch({ query, gender, categoryId })
-  const { refreshing, onRefresh } = useRefreshControl(async () => {
-    if (active) await results.refetch({ cancelRefetch: false })
-  })
+  const { categories, results, active, refreshFirstPage, rows } = usePlayerSearch({ query, gender, categoryId })
+  const { refreshing, onRefresh } = useRefreshControl(refreshFirstPage)
+  const categoryOptions = categories.data?.slice().reverse()
+
+  function handleRefresh() {
+    if (active && !results.isFetching && !refreshing) void onRefresh()
+  }
+
   return <View className="flex-1 bg-[#f2f2f3]">
     <SafeAreaView edges={['top']} className="bg-[#120F18]">
       <Text accessibilityRole="header" className="px-4 py-4 font-inter-700 text-xl text-white">Jugadores</Text>
@@ -43,7 +47,7 @@ export default function PlayersScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ gap: 8 }}>
         <Filter label="Todos" current={!categoryId} onPress={() => setCategory(undefined)} />
-        {categories.data?.map(category => <Filter key={category.id} label={category.name}
+        {categoryOptions?.map(category => <Filter key={category.id} label={category.name}
           current={categoryId === category.id} onPress={() => setCategory(category.id)} />)}
       </ScrollView>
       {categories.isError && <View className="flex-row items-center justify-between">
@@ -51,19 +55,30 @@ export default function PlayersScreen() {
         <Button variant="ghost" onPress={() => { void categories.refetch() }}>Reintentar</Button>
       </View>}
     </View>
-    <RefreshableScrollView alwaysBounceVertical={active} refreshing={refreshing} onRefresh={onRefresh}
+    <RefreshableScrollView alwaysBounceVertical={active} refreshing={refreshing} onRefresh={handleRefresh}
       keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16, flexGrow: 1 }}>
       {!active && <Text className="py-5 font-sans text-sm text-[#605e64]">Buscá por nombre o elegí un filtro.</Text>}
-      {active && results.isPending && <View accessibilityLabel="Buscando jugadores" className="gap-1">
-        {[1, 2, 3, 4].map(id => <View key={id} className="h-16 rounded-lg bg-[#e7e7e8]" />)}
+      {active && results.isPending && <View accessible accessibilityLabel="Buscando jugadores" className="gap-2">
+        {[1, 2, 3, 4, 5].map(id => <View key={id} className="h-[66px] flex-row items-center gap-3 rounded-xl border border-divider bg-white px-3">
+          <View className="h-10 w-10 rounded-full bg-divider" />
+          <View className="gap-2">
+            <View className="h-3.5 w-[140px] rounded bg-divider" />
+            <View className="h-2.5 w-[90px] rounded bg-divider" />
+          </View>
+        </View>)}
       </View>}
-      {active && results.isError && <View className="rounded-lg bg-white p-4">
-        <Text accessibilityLiveRegion="polite" className="font-sans text-sm">No pudimos cargar los jugadores. Revisá tu conexión.</Text>
-        <Button variant="ghost" onPress={() => { void results.refetch() }}>Reintentar</Button>
+      {active && results.isError && <View className="pb-3">
+        <View className="items-center gap-1 rounded-2xl border border-divider bg-white p-2">
+          <CircleX size={20} color="#605E64" />
+          <Text accessibilityLiveRegion="polite" className="text-center font-inter-500 text-sm text-[#605e64]">No pudimos cargar jugadores</Text>
+          <Text className="max-w-[176px] font-sans text-xs text-muted-foreground">Revisá tu conexión e intentá de nuevo.</Text>
+        </View>
+        <Button className="mt-3 h-10 rounded-lg" loading={results.isFetching} onPress={handleRefresh}>Reintentar</Button>
       </View>}
-      {active && results.isSuccess && !rows.length && <View className="gap-1 rounded-lg bg-white p-4">
-        <Text className="font-inter-600 text-sm">Sin resultados</Text>
-        <Text className="font-sans text-sm text-[#605e64]">Probá con otro nombre o cambiá los filtros.</Text>
+      {active && results.isSuccess && !rows.length && <View className="min-h-[106px] items-center justify-center gap-1 rounded-2xl border border-divider bg-white p-2">
+        <Search size={20} color="#605E64" />
+        <Text className="font-inter-500 text-sm text-[#605e64]">Sin resultados</Text>
+        <Text className="max-w-[176px] font-sans text-xs text-muted-foreground">Probá con otro nombre o cambiá los filtros.</Text>
       </View>}
       <View className="overflow-hidden rounded-t-xl">
         {rows.map(player => <Pressable key={player.playerId} accessibilityRole="link"
@@ -79,8 +94,9 @@ export default function PlayersScreen() {
           <ArrowForwardIcon size={20} color="#605E64" />
         </Pressable>)}
       </View>
-      {results.hasNextPage && <Button variant="secondary" className="mt-3" loading={results.isFetchingNextPage}
-        onPress={() => { void results.fetchNextPage() }}>Ver más</Button>}
+      {rows.length > 0 && results.hasNextPage && <Button variant="secondary" className="mt-3"
+        disabled={results.isFetching} loading={results.isFetchingNextPage}
+        onPress={() => { void results.fetchNextPage({ cancelRefetch: false }) }}>Ver más</Button>}
     </RefreshableScrollView>
   </View>
 }
