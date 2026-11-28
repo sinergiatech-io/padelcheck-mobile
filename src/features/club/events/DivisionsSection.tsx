@@ -214,6 +214,7 @@ function DivisionView({ clubId, event, division, leave }: { clubId: string; even
     <Text className="font-inter-500" style={d.muted}>{selectionSummary(selection, savedCatalog(division))}</Text>
     {showRegistration && <DivisionRegistration key={clubId + '/' + event.id + '/' + division.id}
       scope={{ clubId, eventId: event.id, divisionId: division.id }}
+      divisionTitle={savedTitle(division)}
       open={event.status === 'INSCRIPTION_OPEN' && division.status === 'INSCRIPTION_OPEN'} admin={admin} />}
     <QuotaFields selection={selection} set={() => undefined} touched={false} fixed />
   </Shell>

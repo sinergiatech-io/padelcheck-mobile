@@ -1,5 +1,15 @@
-import type { RecoveryState } from './recovery-machine'
-export function recoveryCopy(state: RecoveryState) {
+import type { RecoveryPurpose, RecoveryState } from './recovery-machine'
+export function recoveryCopy(state: RecoveryState, purpose: RecoveryPurpose = 'recovery') {
+  if (purpose === 'invitation') {
+    switch (state.stage) {
+      case 'request': return { title: 'Solicitá otra invitación', detail: 'Ingresá el email que le diste a tu club. Si tenés una invitación pendiente, te enviaremos un enlace.', action: 'Enviar enlace' }
+      case 'sent': return { title: 'Revisá tu correo', detail: 'Si hay una invitación pendiente para ese email, te enviaremos un enlace para activar tu cuenta.', action: '' }
+      case 'password': return { title: 'Creá tu contraseña de PadelCheck', detail: 'Al guardar, vas a verificar tu email y activar tu acceso a Padel Check.', help: 'Usá al menos 8 caracteres.', action: 'Guardar contraseña' }
+      case 'invalid': return { title: 'Este enlace ya no está disponible', detail: 'Si tu cuenta sigue pendiente de activación, podés solicitar otra invitación.', action: 'Solicitar otro enlace' }
+      case 'success': return { title: 'Tu cuenta está activa', detail: 'Ya podés ingresar con tu email y contraseña.', action: 'Ir al acceso' }
+      default: break
+    }
+  }
   const first = state.passwordAction === 'CREATE_PASSWORD'
   switch (state.stage) {
     case 'request': return { title: 'Recuperá el acceso a tu cuenta', detail: 'Ingresá tu email. Si tiene una cuenta, te enviaremos un enlace de un solo uso para crear o restablecer tu contraseña.', help: 'Ingresar tu email no habilita el acceso. También sirve si hasta ahora entrabas solo con Google.', action: 'Enviar enlace' }
