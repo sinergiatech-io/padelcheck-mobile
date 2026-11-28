@@ -6,21 +6,24 @@ import { SvgXml } from 'react-native-svg'
 import { Button } from '@/components/ui/button'
 import { StartupReady } from '@/features/startup/StartupReady'
 import { useRecovery } from './use-recovery'
+import type { RecoveryPurpose } from './recovery-machine'
 import { recoveryCopy } from './recovery-copy'
 import { clearRecoveryLink, readRecoveryLink } from './recovery-link'
 import { eyeXml, eyeOnXml } from './auth-icons'
 import { recoveryCourtXml } from './recovery-assets'
 import { successXml } from './register-icons'
 
-export function PasswordRecoveryScreen({ reset = false }: { reset?: boolean }) {
+export function PasswordRecoveryScreen({ reset = false, purpose = 'recovery' }: { reset?: boolean; purpose?: RecoveryPurpose }) {
   const { attempt } = useLocalSearchParams<{ attempt?: string }>()
-  const link = useMemo(() => reset ? readRecoveryLink() : undefined, [attempt, reset])
-  useEffect(() => { if (reset) clearRecoveryLink() }, [attempt, reset])
-  return <RecoveryForm key={`${reset}-${link?.id ?? 0}`} token={reset ? link?.token ?? '' : undefined} />
+  const route = purpose === 'invitation' ? '/activate-player' : '/reset-password'
+  const link = useMemo(() => reset ? readRecoveryLink(route) : undefined, [attempt, reset, route])
+  useEffect(() => { if (reset) clearRecoveryLink(route) }, [attempt, reset, route])
+  return <RecoveryForm key={`${purpose}-${reset}-${link?.id ?? 0}`} purpose={purpose} token={reset ? link?.token ?? '' : undefined} />
 }
-function RecoveryForm({ token }: { token?: string }) {
-  const { machine, state, blocked } = useRecovery(Platform.OS === 'ios' ? 'IOS' : 'ANDROID', token)
-  const copy = recoveryCopy(state)
+function RecoveryForm({ token, purpose }: { token?: string; purpose: RecoveryPurpose }) {
+  const invitation = purpose === 'invitation'
+  const { machine, state, blocked } = useRecovery(Platform.OS === 'ios' ? 'IOS' : 'ANDROID', token, purpose)
+  const copy = recoveryCopy(state, purpose)
   const insets = useSafeAreaInsets()
   const [keyboard, setKeyboard] = useState(false)
   const [visible, setVisible] = useState<Record<string, boolean>>({})
@@ -39,10 +42,10 @@ function RecoveryForm({ token }: { token?: string }) {
     AccessibilityInfo.announceForAccessibility(copy.title)
   }, [state.stage, copy.title])
   useEffect(() => { if (state.notice) AccessibilityInfo.announceForAccessibility(state.notice) }, [state.notice])
-  const leave = (path: '/login' | '/forgot-password') => { machine.cancel(); router.replace(path) }
+  const leave = (path: '/login' | '/forgot-password' | '/request-player-invitation') => { machine.cancel(); router.replace(path) }
   const submit = async () => {
     if (state.stage === 'success') return leave('/login')
-    if (state.stage === 'invalid') return leave('/forgot-password')
+    if (state.stage === 'invalid') return leave(invitation ? '/request-player-invitation' : '/forgot-password')
     await machine.run()
     const invalid = Object.keys(machine.state.errors).find(key => machine.state.errors[key as keyof typeof machine.state.errors])
     if (invalid) inputs.current[invalid]?.focus()
@@ -60,7 +63,7 @@ function RecoveryForm({ token }: { token?: string }) {
           <Text ref={heading} accessibilityRole="header" className="font-inter-600 text-[24px] leading-[32px] text-[#120F18]">{copy.title}</Text>
           {!!copy.detail && <Text className="font-sans text-[16px] leading-[24px] text-[#605E64]">{copy.detail}</Text>}
           {state.notice && <View accessibilityRole="alert" className="rounded-[8px] border border-[#FAC5C5] bg-[#FDECEC] p-[12px]"><Text className="font-inter-600 text-[14px] leading-[20px] text-[#120F18]">{state.notice}</Text><Text className="font-sans text-[12px] leading-[16px] text-[#605E64]">{state.retryAt > Date.now() ? 'Intentá de nuevo cuando termine el límite indicado por el servidor.' : state.stage === 'request' ? 'Intentá de nuevo en unos minutos.' : 'Intentá de nuevo.'}</Text></View>}
-          {state.stage === 'success' && <View accessibilityRole="alert" className="flex-row items-center gap-[12px] rounded-[8px] border border-[#BAEDCD] bg-[#E9F9EF] p-[12px]"><SvgXml xml={successXml} width={24} height={24} /><View className="flex-1"><Text className="font-inter-600 text-[14px] leading-[20px] text-[#120F18]">Dos formas de ingresar</Text><Text className="mt-[2px] font-sans text-[12px] leading-[16px] text-[#605E64]">Podés usar tu email y contraseña. Si vinculaste Google, también sigue disponible.</Text></View></View>}
+          {state.stage === 'success' && !invitation && <View accessibilityRole="alert" className="flex-row items-center gap-[12px] rounded-[8px] border border-[#BAEDCD] bg-[#E9F9EF] p-[12px]"><SvgXml xml={successXml} width={24} height={24} /><View className="flex-1"><Text className="font-inter-600 text-[14px] leading-[20px] text-[#120F18]">Dos formas de ingresar</Text><Text className="mt-[2px] font-sans text-[12px] leading-[16px] text-[#605E64]">Podés usar tu email y contraseña. Si vinculaste Google, también sigue disponible.</Text></View></View>}
           {keys.map(key => {
             const label = key === 'email' ? 'Email' : key === 'password' ? 'Nueva contraseña' : 'Confirmar contraseña'
             return <View key={key} className="gap-[8px]"><Text nativeID={`${key}-label`} className="font-inter-500 text-[14px] leading-[20px] text-[#120F18]">{label}</Text><View className="relative">
@@ -80,6 +83,7 @@ function RecoveryForm({ token }: { token?: string }) {
         <View className="mt-auto gap-[8px] px-[16px] pb-[24px] pt-[16px]">
           {!!copy.action && <Button onPress={() => void submit()} disabled={blocked || state.stage === 'inspect'} loading={state.busy} loadingLabel={busyLabel} className="h-[48px] rounded-[8px]">{copy.action}</Button>}
           {state.stage !== 'success' && <Button variant="secondary" onPress={() => leave('/login')} className="h-[48px] rounded-[8px] border-[#929195]">Volver al acceso</Button>}
+          {state.stage === 'request' && !invitation && <Button variant="secondary" onPress={() => leave('/request-player-invitation')} className="h-[48px] rounded-[8px] border-[#929195]">Solicitar invitación del club</Button>}
         </View>
       </ScrollView>
     </View>

@@ -1,4 +1,5 @@
 export type RecoveryPlatform = 'WEB' | 'ANDROID' | 'IOS'
+export type RecoveryPurpose = 'recovery' | 'invitation'
 export type PasswordAction = 'CREATE_PASSWORD' | 'RESET_PASSWORD'
 export type RecoveryStage = 'request' | 'sent' | 'inspect' | 'inspectError' | 'password' | 'invalid' | 'cleanup' | 'success'
 export type RecoveryFields = { email: string; password: string; confirmPassword: string }
@@ -26,7 +27,8 @@ export class RecoveryMachine {
   private controller?: AbortController
   private generation = 0
   constructor(private transport: RecoveryTransport, private platform: RecoveryPlatform, token: string | undefined,
-    private clearSession: () => boolean | Promise<boolean>, private now = Date.now) {
+    private clearSession: () => boolean | Promise<boolean>, private now = Date.now,
+    private purpose: RecoveryPurpose = 'recovery') {
     this.proof = token ?? ''
     this.state = { stage: token === undefined ? 'request' : !token.trim() || token.length > 100 ? 'invalid' : 'inspect', busy: false,
       fields: { email: '', password: '', confirmPassword: '' }, errors: {}, notice: null, retryAt: 0 }
@@ -47,6 +49,9 @@ export class RecoveryMachine {
     if (busy || this.now() < retryAt || !['request', 'inspect', 'inspectError', 'password', 'cleanup'].includes(stage)) return
     if (stage === 'request' || stage === 'password') {
       const errors = validateRecovery(fields, stage === 'password')
+      if (stage === 'password' && this.purpose === 'invitation' && fields.password.length > 72) {
+        errors.password = 'Usá como máximo 72 caracteres.'
+      }
       this.update({ errors })
       if (Object.keys(errors).length) return
     }
@@ -55,17 +60,19 @@ export class RecoveryMachine {
     this.update({ busy: true, notice: null })
     try {
       const options = { signal: this.controller.signal, timeoutMs: 15000, cache: 'no-store' as const }
+      const route = this.purpose === 'invitation' ? '/auth/player-invitation' : '/auth/password-recovery'
       if (stage === 'request') {
-        await this.transport.post('/auth/password-recovery/request', { email: fields.email.trim(), platform: this.platform }, options)
+        const request = this.purpose === 'invitation' ? { email: fields.email.trim() } : { email: fields.email.trim(), platform: this.platform }
+        await this.transport.post(route + '/request', request, options)
         if (attempt === this.generation) this.update({ stage: 'sent', fields: { email: '', password: '', confirmPassword: '' } })
       } else if (stage === 'inspect' || stage === 'inspectError') {
-        const result = await this.transport.post<{ passwordAction?: PasswordAction }>('/auth/password-recovery/inspect', { token: this.proof }, options)
+        const result = await this.transport.post<{ passwordAction?: PasswordAction }>(route + '/inspect', { token: this.proof }, options)
         if (attempt !== this.generation) return
         if (result?.passwordAction !== 'CREATE_PASSWORD' && result?.passwordAction !== 'RESET_PASSWORD') throw new Error('Invalid capability')
         this.update({ stage: 'password', passwordAction: result.passwordAction })
       } else {
         if (stage === 'password') {
-          await this.transport.post('/auth/password-recovery/confirm', { token: this.proof, password: fields.password, confirmPassword: fields.confirmPassword }, options)
+          await this.transport.post(route + '/confirm', { token: this.proof, password: fields.password, confirmPassword: fields.confirmPassword }, options)
           if (attempt !== this.generation) return
           this.proof = ''
           this.update({ stage: 'cleanup', fields: { email: '', password: '', confirmPassword: '' } })
@@ -77,9 +84,12 @@ export class RecoveryMachine {
       if (attempt !== this.generation) return
       const failure = error as { status?: number; code?: string; retryAfterMs?: number }
       if ((stage === 'inspect' || stage === 'inspectError' || stage === 'password') && failure.status === 400 &&
-        (failure.code === 'PASSWORD_RECOVERY_INVALID_LINK' || failure.code === 'PASSWORD_RECOVERY_INVALID_INPUT' && stage !== 'password')) {
+        (failure.code === (this.purpose === 'invitation' ? 'PLAYER_INVITATION_INVALID_LINK' : 'PASSWORD_RECOVERY_INVALID_LINK')
+          || (failure.code === 'PASSWORD_RECOVERY_INVALID_INPUT' && stage !== 'password'))) {
         this.proof = ''
         this.update({ stage: 'invalid', fields: { email: '', password: '', confirmPassword: '' } })
+      } else if (stage === 'password' && failure.code === 'PLAYER_INVITATION_INVALID_PASSWORD') {
+        this.update({ errors: { password: 'Acortá la contraseña o usá menos caracteres especiales.' } })
       } else {
         const limited = failure.status === 429
         const cleanup = this.state.stage === 'cleanup'

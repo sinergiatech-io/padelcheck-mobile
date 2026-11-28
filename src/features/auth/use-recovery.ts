@@ -2,13 +2,13 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { API_BASE } from '@/lib/constants'
 import { createApiClient } from '@/lib/http-client'
 import { useAuth } from '@/context/AuthContext'
-import { RecoveryMachine, type RecoveryPlatform } from './recovery-machine'
+import { RecoveryMachine, type RecoveryPlatform, type RecoveryPurpose } from './recovery-machine'
 
 // Public recovery never sends the previous session's bearer or cookies.
 const recoveryClient = createApiClient({ baseUrl: API_BASE, getToken: () => null, credentials: 'omit' })
-export function useRecovery(platform: RecoveryPlatform, token?: string) {
+export function useRecovery(platform: RecoveryPlatform, token?: string, purpose: RecoveryPurpose = 'recovery') {
   const { logout } = useAuth()
-  const [machine] = useState(() => new RecoveryMachine(recoveryClient, platform, token, logout))
+  const [machine] = useState(() => new RecoveryMachine(recoveryClient, platform, token, logout, Date.now, purpose))
   const state = useSyncExternalStore(machine.subscribe, machine.snapshot)
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
