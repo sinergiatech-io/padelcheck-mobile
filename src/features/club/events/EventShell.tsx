@@ -23,6 +23,9 @@ export const eventIcons = {
   menuEdit: Image.resolveAssetSource(require('@/assets/club-events/menu-edit.svg')),
   menuCancel: Image.resolveAssetSource(require('@/assets/club-events/menu-cancel.svg')),
   modalClose: Image.resolveAssetSource(require('@/assets/club-events/modal-close.svg')),
+  pairPlayer: Image.resolveAssetSource(require('@/assets/club-events/pair-selected-player.svg')),
+  pairRejected: Image.resolveAssetSource(require('@/assets/club-events/pair-rejected.svg')),
+  pairSearch: Image.resolveAssetSource(require('@/assets/club-events/pair-search.svg')),
   listPin: Image.resolveAssetSource(require('@/assets/club-events/list-pin.svg')),
   listDate: Image.resolveAssetSource(require('@/assets/club-events/list-date.svg')),
   listArrow: Image.resolveAssetSource(require('@/assets/club-events/list-arrow.svg')),
@@ -38,7 +41,8 @@ export function Icon({ name }: { name: keyof typeof venueIcons }) {
   return <SvgXml xml={xml} width={width} height={height} />
 }
 export function EventIcon({ name }: { name: keyof typeof eventIcons }) {
-  const size = name === 'hubCalendarNotice' || name === 'hubCancelled' ? 20 : 24
+  const size = name === 'pairPlayer' ? 19.9832 :
+    name === 'hubCalendarNotice' || name === 'hubCancelled' || name === 'pairRejected' ? 20 : 24
   return <SvgUri uri={eventIcons[name]?.uri ?? null} width={size} height={size} />
 }
 export function Copy({ children, strong = false, small = false, muted = false }: {
